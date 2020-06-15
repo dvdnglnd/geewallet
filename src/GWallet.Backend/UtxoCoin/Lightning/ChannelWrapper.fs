@@ -4,7 +4,6 @@ open System
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Channel
 open DotNetLightning.Chain
 
@@ -22,11 +21,11 @@ type ChannelWrapper = {
                          (fundingTxProvider: ProvideFundingTx)
                          (initialState: ChannelState)
                              : Async<ChannelWrapper> = async {
-        let channelConfig =
-            let handshakeConfig = {
-                ChannelHandshakeConfig.MinimumDepth = BlockHeightOffset32 1u
+        let channelConfig: DotNetLightning.Utils.ChannelConfig =
+            let handshakeConfig: DotNetLightning.Utils.ChannelHandshakeConfig = {
+                MinimumDepth = BlockHeightOffset32 1u
             }
-            let peerLimits: ChannelHandshakeLimits = {
+            let peerLimits: DotNetLightning.Utils.ChannelHandshakeLimits = {
                 ForceChannelAnnouncementPreference = false
                 MinFundingSatoshis = Money 100L
                 MaxHTLCMinimumMSat = LNMoney 100000L
@@ -39,7 +38,7 @@ type ChannelWrapper = {
                 MaxMinimumDepth = BlockHeightOffset32 UInt32.MaxValue
                 MaxClosingNegotiationIterations = 10
             }
-            let channelOptions = {
+            let channelOptions: DotNetLightning.Utils.ChannelOptions = {
                 AnnounceChannel = false
                 FeeProportionalMillionths = 100u
                 MaxFeeRateMismatchRatio = 1.
@@ -61,20 +60,23 @@ type ChannelWrapper = {
                 nodeSecret.PrivateKey,
                 fundingTxProvider,
                 network,
-                nodeId
+                nodeId.DnlNodeId
             )
         let channel = { channel with State = initialState }
         return { Channel = channel }
     }
 
     member this.RemoteNodeId
-        with get(): NodeId = this.Channel.RemoteNodeId
+        with get(): NodeId = NodeId this.Channel.RemoteNodeId
 
     member this.Network
         with get(): Network = this.Channel.Network
 
     member this.ChannelId
-        with get(): Option<ChannelId> = this.Channel.State.ChannelId
+        with get(): Option<ChannelId> =
+            match this.Channel.State.ChannelId with
+            | Some channelId -> Some <| ChannelId channelId
+            | None -> None
 
     member this.ChannelKeys
         with get(): ChannelKeys =
@@ -96,7 +98,7 @@ type ChannelWrapper = {
                             (defaultFinalScriptPubKey: Script)
                             (isFunder: bool)
                                 : LocalParams = {
-        NodeId = this.RemoteNodeId
+        NodeId = this.RemoteNodeId.DnlNodeId
         ChannelPubKeys = this.ChannelKeys.ToChannelPubKeys()
         DustLimitSatoshis = Money 5UL
         MaxHTLCValueInFlightMSat = LNMoney 5000L

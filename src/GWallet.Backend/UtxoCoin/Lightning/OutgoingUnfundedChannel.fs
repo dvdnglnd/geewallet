@@ -5,7 +5,6 @@ open System.Diagnostics
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 open DotNetLightning.Chain
 open DotNetLightning.Channel
@@ -92,18 +91,14 @@ type OutgoingUnfundedChannel = {
             let funding = Money(channelCapacity.ValueToSend, MoneyUnit.BTC)
             let defaultFinalScriptPubKey = Account.CreatePayoutScript account
             channelWrapper.LocalParams funding defaultFinalScriptPubKey true
-        let temporaryChannelId =
-            let random = Org.BouncyCastle.Security.SecureRandom() :> Random
-            let temporaryChannelIdBytes: array<byte> = Array.zeroCreate 32
-            random.NextBytes temporaryChannelIdBytes
-            temporaryChannelIdBytes |> uint256 |> ChannelId
+        let temporaryChannelId = ChannelId.NewRandom()
         let feeRate =
             channelWrapper.Channel.FeeEstimator.GetEstSatPer1000Weight ConfirmationTarget.Normal
         let openChannelMsgRes, channelWrapperAfterOpenChannel =
             let channelCommand =
                 let inputInitFunder = {
-                    InputInitFunder.PushMSat = LNMoney.MilliSatoshis 0L
-                    TemporaryChannelId = temporaryChannelId
+                    InputInitFunder.PushMSat = LNMoney 0L
+                    TemporaryChannelId = temporaryChannelId.DnlChannelId
                     FundingSatoshis = Money (channelCapacity.ValueToSend, MoneyUnit.BTC)
                     InitFeeRatePerKw = feeRate
                     FundingTxFeeRatePerKw = feeRate

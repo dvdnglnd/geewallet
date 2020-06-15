@@ -77,9 +77,11 @@
     <Compile Include="UtxoCoin\UtxoCoinMinerFee.fs" />
     <Compile Include="UtxoCoin\TransactionTypes.fs" />
     <Compile Include="UtxoCoin\UtxoCoinAccount.fs" />
+    <Compile Include="UtxoCoin\Lightning\Primitives.fs" />
     <Compile Include="UtxoCoin\Lightning\Util.fs" />
     <Compile Include="UtxoCoin\Lightning\JsonMarshalling.fs" />
     <Compile Include="UtxoCoin\Lightning\SerializedChannel.fs" />
+    <Compile Include="UtxoCoin\Lightning\ChannelStore.fs" />
     <Compile Include="UtxoCoin\Lightning\Transport.fs" />
     <Compile Include="UtxoCoin\Lightning\MsgStream.fs" />
     <Compile Include="UtxoCoin\Lightning\PeerWrapper.fs" />
@@ -90,6 +92,7 @@
     <Compile Include="UtxoCoin\Lightning\OutgoingUnfundedChannel.fs" />
     <Compile Include="UtxoCoin\Lightning\FundedChannel.fs" />
     <Compile Include="UtxoCoin\Lightning\ActiveChannel.fs" />
+    <Compile Include="UtxoCoin\Lightning\LightningNode.fs" />
     <Compile Include="Ether\EtherExceptions.fs" />
     <Compile Include="Ether\EtherMinerFee.fs" />
     <Compile Include="Ether\TransactionMetadata.fs" />

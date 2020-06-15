@@ -3,11 +3,10 @@ namespace GWallet.Frontend.Console
 open System
 open System.IO
 
-open DotNetLightning.Utils
-open DotNetLightning.Channel
 open GWallet.Backend
 open GWallet.Backend.UtxoCoin.Lightning
 
+(*
 module Lightning =
     let GetLightningChannelId(): Option<ChannelId> =
         SerializedChannel.ListSavedChannels() |> Seq.tryHead
@@ -69,4 +68,5 @@ module Lightning =
                 | ChannelStatus.Active -> yield channelId
                 | _ -> ()
     }
+*)
 

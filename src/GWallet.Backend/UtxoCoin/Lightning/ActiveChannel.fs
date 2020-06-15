@@ -5,7 +5,6 @@ open System.Diagnostics
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 open DotNetLightning.Channel
 open DotNetLightning.Transactions
@@ -276,11 +275,12 @@ and ActiveChannel = {
             return failwith <| SPrintF1 "unexpected channel state: %A" channelWrapper.Channel.State
     }
 
-    static member ConnectReestablish (nodeSecret: ExtKey)
+    static member ConnectReestablish (channelStore: ChannelStore)
+                                     (nodeSecretKey: ExtKey)
                                      (channelId: ChannelId)
                                          : Async<Result<ActiveChannel, ReconnectActiveChannelError>> = async {
         let! connectRes =
-            ConnectedChannel.ConnectFromWallet nodeSecret channelId
+            ConnectedChannel.ConnectFromWallet channelStore nodeSecretKey channelId
         match connectRes with
         | Error reconnectError -> return Error <| Reconnect reconnectError
         | Ok connectedChannel ->
@@ -290,11 +290,12 @@ and ActiveChannel = {
             | Ok activeChannel -> return Ok activeChannel
     }
 
-    static member AcceptReestablish (transportListener: TransportListener)
+    static member AcceptReestablish (channelStore: ChannelStore)
+                                    (transportListener: TransportListener)
                                     (channelId: ChannelId)
                                         : Async<Result<ActiveChannel, ReconnectActiveChannelError >> = async {
         let! connectRes =
-            ConnectedChannel.AcceptFromWallet transportListener channelId
+            ConnectedChannel.AcceptFromWallet channelStore transportListener channelId
         match connectRes with
         | Error reconnectError -> return Error <| Reconnect reconnectError
         | Ok connectedChannel ->

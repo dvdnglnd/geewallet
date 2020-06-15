@@ -6,8 +6,8 @@ open System.Linq
 open System.Globalization
 open System.Net
 
-open DotNetLightning.Utils
-open DotNetLightning.Channel
+//open DotNetLightning.Utils
+//open DotNetLightning.Channel
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.UtxoCoin.Lightning
@@ -23,10 +23,12 @@ type internal Operations =
     | ArchiveAccount          = 7
     | PairToWatchWallet       = 8
     | Options                 = 9
+    (*
     | OpenChannel             = 10
     | AcceptChannel           = 11
     | SendLightningPayment    = 12
     | ReceiveLightningPayment = 13
+    *)
 
 type WhichAccount =
     All of seq<IAccount> | MatchingWith of IAccount
@@ -86,6 +88,7 @@ module UserInteraction =
             ->
                 not noAccounts
         | Operations.CreateAccounts -> noAccounts
+        (*
         | Operations.OpenChannel
         | Operations.AcceptChannel
             -> not noAccounts
@@ -93,6 +96,7 @@ module UserInteraction =
             (Lightning.ListAvailableChannelIds true).Any()
         | Operations.ReceiveLightningPayment ->
             (Lightning.ListAvailableChannelIds false).Any()
+        *)
         | _ -> true
 
     let rec internal AskFileNameToLoad (askText: string): FileInfo =
@@ -268,6 +272,7 @@ module UserInteraction =
         | _ ->
             DisplayAccountStatusInner accountNumber account maybeBalance maybeUsdValue
 
+    (*
     let GetLightningBalance (channelState: IHasCommitments): decimal * decimal =
         let balance = channelState.Commitments.LocalCommit.Spec.ToLocal
         let channelReserve = channelState.Commitments.LocalParams.ChannelReserveSatoshis
@@ -355,6 +360,7 @@ module UserInteraction =
             yield! DisplayLightningChannelStatus channelId
         yield String.Empty
     }
+    *)
 
     let private GetAccountBalanceInner (account: IAccount): Async<IAccount*MaybeCached<decimal>*MaybeCached<decimal>> =
         async {
@@ -697,6 +703,7 @@ module UserInteraction =
                 | Some amountOption ->
                     AskParticularAmountOption balance amountOption
 
+    (*
     let rec AskLightningAmount (channelId: ChannelId): Option<TransferAmount> =
         let serializedChannel = SerializedChannel.LoadFromWallet channelId
         option {
@@ -756,6 +763,7 @@ module UserInteraction =
                     else
                         return TransferAmount(amountBtc, balanceBtc, Currency.BTC)
         }
+    *)
 
     let AskFee account amount destination: Option<IBlockchainFeeInfo> =
         try
@@ -842,6 +850,7 @@ module UserInteraction =
     let private AskIPAddressAndPort (ipMsg: string) (portMsg: string): IPEndPoint =
         IPEndPoint(AskIPAddress ipMsg, AskPort portMsg)
 
+    (*
     // Throws FormatException
     let private AskChannelCounterpartyPubKey(): NBitcoin.PubKey =
         Console.Write "Channel counterparty public key in hexadecimal notation: "
@@ -918,4 +927,4 @@ module UserInteraction =
                 Some (channels.ElementAt index)
             else
                 None
-
+    *)

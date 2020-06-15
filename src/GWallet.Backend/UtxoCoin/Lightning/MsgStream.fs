@@ -5,7 +5,6 @@ open System.Collections
 open System.Net
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 open DotNetLightning.Serialize
 

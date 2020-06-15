@@ -341,6 +341,16 @@ module Account =
             return raise <| InsufficientBalanceForFee None
     }
 
+    let internal EstimateFeeP2WSH (account: IUtxoAccount)
+                                  (amount: TransferAmount)
+                                      : Async<TransactionMetadata> =
+        // use a dummy, all-zero witness script to estimate the fee
+        let witScriptIdLength = 32
+        let nullScriptId = NBitcoin.WitScriptId (Array.zeroCreate witScriptIdLength)
+        let dummyAddr = NBitcoin.BitcoinWitScriptAddress (nullScriptId, Config.BitcoinNet)
+
+        EstimateFeeForDestination account amount dummyAddr
+
     let EstimateFee (account: IUtxoAccount) (amount: TransferAmount) (destination: string)
                         : Async<TransactionMetadata> =
         EstimateFeeForDestination

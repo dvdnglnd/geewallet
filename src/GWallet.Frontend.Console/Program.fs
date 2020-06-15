@@ -4,7 +4,7 @@ open System.Linq
 open System.Text.RegularExpressions
 open System.Net
 
-open DotNetLightning.Utils
+//open DotNetLightning.Utils
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.UtxoCoin.Lightning
@@ -12,92 +12,89 @@ open GWallet.Frontend.Console
 
 let random = Org.BouncyCastle.Security.SecureRandom () :> Random
 
+(*
 let BindLightning (account: UtxoCoin.NormalUtxoAccount)
                   (password: string)
                        : TransportListener =
     let nodeSecret = Lightning.GetLightningNodeSecret account password
     let ipEndpoint = UserInteraction.AskBindAddress()
     TransportListener.Bind nodeSecret ipEndpoint
+*)
 
 let OpenChannel(): Async<unit> = async {
     let account = UserInteraction.AskBitcoinAccount()
+    let channelStore = ChannelStore account
 
     match UserInteraction.AskAmount account with
     | None -> return ()
     | Some channelCapacity ->
         match UserInteraction.AskChannelCounterpartyConnectionDetails() with
         | None -> return ()
-        | Some (ipEndPoint, pubKey) ->
+        | Some (peerEndPoint, peerNodeId) ->
             DebugLogger "Calling EstimateFee..."
-            let metadata =
-                // this dummy address is only used for fee estimation
-                let witScriptIdLength = 32
-                let nullScriptId = NBitcoin.WitScriptId (Array.zeroCreate witScriptIdLength)
-                let dummyAddr = NBitcoin.BitcoinWitScriptAddress (nullScriptId, Config.BitcoinNet)
-
+            let! metadataOpt = async {
                 try
-                    UtxoCoin.Account.EstimateFeeForDestination
-                         account channelCapacity dummyAddr
-                         |> Async.RunSynchronously
+                    let! metadata = UtxoCoin.Account.EstimateFeeP2WSH account channelCapacity
+                    return Some metadata
                 with
                 | InsufficientBalanceForFee _ ->
-                    failwith "Estimated fee is too high for the remaining balance, \
-                              use a different account or a different amount."
-            Presentation.ShowFeeAndSpendableBalance metadata channelCapacity
+                    Console.WriteLine
+                        "Estimated fee is too high for the remaining balance, \
+                        use a different account or a different amount."
+                    return None
+            }
+            match metadataOpt with
+            | None -> return ()
+            | Some metadata ->
+                Presentation.ShowFeeAndSpendableBalance metadata channelCapacity
 
-            let acceptFeeRate = UserInteraction.AskYesNo "Do you accept?"
-            if acceptFeeRate then
-                let password = UserInteraction.AskPassword false
-                let nodeSecret = Lightning.GetLightningNodeSecret account password
-                let peerNodeId = DotNetLightning.Utils.Primitives.NodeId pubKey
-                let peerId = DotNetLightning.Utils.Primitives.PeerId (ipEndPoint :> EndPoint)
-                let! connectRes =
-                    PeerWrapper.Connect nodeSecret peerNodeId peerId
-                match connectRes with
-                | FSharp.Core.Error connectError ->
-                    Console.WriteLine (sprintf "Error connecting to peer: %s" connectError.Message)
-                    if connectError.PossibleBug then
-                        let msg =
-                            sprintf
-                                "Error connecting to peer:%s@%s:%i: %s"
-                                (pubKey.ToString())
-                                (ipEndPoint.Address.ToString())
-                                ipEndPoint.Port
-                                connectError.Message
-                        Infrastructure.ReportWarningMessage msg
-                | FSharp.Core.Ok peerWrapper ->
-                    let! outgoingUnfundedChannelRes =
-                        OutgoingUnfundedChannel.OpenChannel
-                            peerWrapper
-                            account
-                            channelCapacity
-                            metadata
-                            password
-
-                    match outgoingUnfundedChannelRes with
-                    | FSharp.Core.Error openChannelError ->
-                        Console.WriteLine(sprintf "Error opening channel: %s" openChannelError.Message)
-                        if openChannelError.PossibleBug then
-                            let msg =
-                                sprintf
-                                    "Error opening channel with peer:%s@%s:%i: %s"
-                                    (pubKey.ToString())
-                                    (ipEndPoint.Address.ToString())
-                                    ipEndPoint.Port
-                                    openChannelError.Message
-                            Infrastructure.ReportWarningMessage msg
-                    | FSharp.Core.Ok outgoingUnfundedChannel ->
+                let acceptFeeRate = UserInteraction.AskYesNo "Do you accept?"
+                if acceptFeeRate then
+                    let password = UserInteraction.AskPassword false
+                    let bindAddress = IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
+                    let lightningNode = LightningNode.Start channelStore password bindAddress
+                    let acceptCallback minimumDepth =
                         Console.WriteLine(
                             sprintf
                                 "Opening a channel with this party will require %i confirmations (~%i minutes)"
-                                outgoingUnfundedChannel.MinimumDepth.Value
-                                (outgoingUnfundedChannel.MinimumDepth.Value * 10u)
+                                minimumDepth
+                                (minimumDepth * 10u)
+                        )
+                        UserInteraction.AskYesNo "Do you accept?"
+
+                    let outgoingUnfundedChannelRes =
+                        lightningNode.OpenChannel
+                            peerNodeId
+                            peerEndPoint
+                            channelCapacity
+                            metadata
+                            password
+                            acceptCallback
+                    match outgoingUnfundedChannelRes with
+                    | Error nodeOpenChannelError ->
+                        Console.WriteLine (sprintf "Error opening channel: %s" nodeOpenChannelError.Message)
+                        if nodeOpenChannelError.PossibleBug then
+                            let msg =
+                                sprintf
+                                    "Error opening channel with peer %s@%s:%i: %s"
+                                    (pubKey.ToString())
+                                    (ipEndPoint.Address.ToString())
+                                    ipEndPoint.Port
+                                    nodeOpenChannelError.Message
+                            Infrastructure.ReportWarningMessage msg
+                    | Ok outgoingUnfundedChannel ->
+                        let minimumDepth = outgoingUnfundedChannel.MinimumDepthUInt32
+                        Console.WriteLine(
+                            sprintf
+                                "Opening a channel with this party will require %i confirmations (~%i minutes)"
+                                minimumDepth
+                                (minimumDepth * 10u)
                         )
                         let acceptMinimumDepth = UserInteraction.AskYesNo "Do you accept?"
                         if acceptMinimumDepth then
                             let! fundedChannelRes = FundedChannel.FundChannel outgoingUnfundedChannel
                             match fundedChannelRes with
-                            | FSharp.Core.Error fundChannelError ->
+                            | Error fundChannelError ->
                                 Console.WriteLine(sprintf "Error funding channel: %s" fundChannelError.Message)
                                 if fundChannelError.PossibleBug then
                                     let msg =
@@ -108,14 +105,15 @@ let OpenChannel(): Async<unit> = async {
                                             ipEndPoint.Port
                                             fundChannelError.Message
                                     Infrastructure.ReportWarningMessage msg
-                            | FSharp.Core.Ok fundedChannel ->
-                                let txId = fundedChannel.FundingTxId
-                                let uri = BlockExplorer.GetTransaction Currency.BTC (txId.Value.ToString())
+                            | Ok fundedChannel ->
+                                let txId = fundedChannel.FundingTxIdString
+                                let uri = BlockExplorer.GetTransaction Currency.BTC txId
                                 Console.WriteLine(sprintf "A funding transaction was broadcast: %A" uri)
                                 (fundedChannel :> IDisposable).Dispose()
             UserInteraction.PressAnyKeyToContinue()
 }
 
+(*
 let AcceptChannel(): Async<unit> = async {
     let account = UserInteraction.AskBitcoinAccount()
     let password = UserInteraction.AskPassword false
@@ -283,6 +281,7 @@ let LockChannelsIfFundingConfirmed(): Async<unit> = async {
                     Infrastructure.ReportWarningMessage msg
         | _ -> ()
 }
+*)
 
 let rec TrySendAmount (account: NormalAccount) transactionMetadata destination amount =
     let password = UserInteraction.AskPassword false
@@ -607,6 +606,7 @@ let rec PerformOperation (numAccounts: int): unit =
         PairToWatchWallet()
     | Operations.Options ->
         WalletOptions()
+    (*
     | Operations.OpenChannel ->
         OpenChannel() |> Async.RunSynchronously
     | Operations.AcceptChannel ->
@@ -615,6 +615,7 @@ let rec PerformOperation (numAccounts: int): unit =
         SendLightningPayment() |> Async.RunSynchronously
     | Operations.ReceiveLightningPayment ->
         ReceiveLightningPayment() |> Async.RunSynchronously
+    *)
     | _ -> failwith "Unreachable"
 
 let rec GetAccountOfSameCurrency currency =
@@ -660,12 +661,14 @@ let rec ProgramMainLoop() =
         yield!
             UserInteraction.DisplayAccountStatuses(WhichAccount.All accounts)
                 |> Async.RunSynchronously
-        yield! UserInteraction.DisplayLightningChannelStatuses()
+        //yield! UserInteraction.DisplayLightningChannelStatuses()
     }
     Console.WriteLine(String.concat Environment.NewLine lines)
 
+    (*
     LockChannelsIfFundingConfirmed()
         |> Async.RunSynchronously
+    *)
 
     if CheckArchivedAccountsAreEmpty() then
         PerformOperation (accounts.Count())
