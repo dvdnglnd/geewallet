@@ -65,6 +65,7 @@
       <Link>Properties\CommonAssemblyInfo.fs</Link>
     </Compile>
     <Compile Include="Presentation.fs" />
+    <Compile Include="Lightning.fs" />
     <Compile Include="UserInteraction.fs" />
     <Compile Include="Program.fs" />
     <Content Include="packages.config" />
