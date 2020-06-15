@@ -6,7 +6,6 @@ open System.IO
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 open DotNetLightning.Channel
 
@@ -67,24 +66,23 @@ type ConnectedChannel = {
         member this.Dispose() =
             (this.PeerWrapper :> IDisposable).Dispose()
 
-    static member private LoadChannel (nodeSecret: ExtKey)
+    static member private LoadChannel (channelStore: ChannelStore)
+                                      (nodeSecretKey: ExtKey)
                                       (channelId: ChannelId)
-                                          : Async<SerializedChannel * NormalUtxoAccount * ChannelWrapper> = async {
-        let serializedChannel = SerializedChannel.LoadFromWallet channelId
-        Infrastructure.LogDebug <| SPrintF1 "loading account for %s" (channelId.Value.ToString())
-        let account = serializedChannel.Account()
-        Infrastructure.LogDebug <| SPrintF1 "loading channel for %s" (channelId.Value.ToString())
+                                          : Async<SerializedChannel * ChannelWrapper> = async {
+        let serializedChannel = channelStore.LoadChannel channelId
+        Infrastructure.LogDebug <| SPrintF1 "loading channel for %s" (channelId.ToString())
         let! channelWrapper =
             let fundingTxProvider (_ : IDestination * Money * FeeRatePerKw) =
                 Result.Error "funding tx not needed cause channel already created"
             ChannelWrapper.Create
-                (NodeId serializedChannel.RemoteNodeId)
-                (Account.CreatePayoutScript account)
-                nodeSecret
+                serializedChannel.RemoteNodeId
+                (Account.CreatePayoutScript channelStore.Account)
+                nodeSecretKey
                 serializedChannel.ChannelIndex
                 fundingTxProvider
                 serializedChannel.ChanState
-        return serializedChannel, account, channelWrapper
+        return serializedChannel, channelWrapper
     }
 
     static member private Reestablish (peerWrapper: PeerWrapper)
@@ -106,9 +104,9 @@ type ConnectedChannel = {
                 | _ -> None
         let ourReestablishMsg = Unwrap ourReestablishMsgRes "error executing channel reestablish command"
 
-        Infrastructure.LogDebug <| SPrintF1 "sending reestablish for %s" (channelId.Value.ToString())
+        Infrastructure.LogDebug <| SPrintF1 "sending reestablish for %s" (channelId.ToString())
         let! peerWrapperAfterReestablishSent = peerWrapper.SendMsg ourReestablishMsg
-        Infrastructure.LogDebug <| SPrintF1 "receiving reestablish for %s" (channelId.Value.ToString())
+        Infrastructure.LogDebug <| SPrintF1 "receiving reestablish for %s" (channelId.ToString())
         let! reestablishRes = async {
             let! recvMsgRes = peerWrapperAfterReestablishSent.RecvChannelMsg()
             match recvMsgRes with
@@ -150,16 +148,17 @@ type ConnectedChannel = {
             return Ok (peerWrapperAfterReestablishReceived, channelWrapperAfterReestablishSent)
     }
 
-    static member ConnectFromWallet (nodeSecret: ExtKey)
+    static member ConnectFromWallet (channelStore: ChannelStore)
+                                    (nodeSecretKey: ExtKey)
                                     (channelId: ChannelId)
                                         : Async<Result<ConnectedChannel, ReconnectError>> = async {
-        let! serializedChannel, account, channelWrapper =
-            ConnectedChannel.LoadChannel nodeSecret channelId
+        let! serializedChannel, channelWrapper =
+            ConnectedChannel.LoadChannel channelStore nodeSecretKey channelId
         let! connectRes =
             let nodeId = channelWrapper.RemoteNodeId
             let peerId = PeerId (serializedChannel.CounterpartyIP :> EndPoint)
             PeerWrapper.Connect
-                nodeSecret
+                nodeSecretKey
                 nodeId
                 peerId
         match connectRes with
@@ -173,7 +172,7 @@ type ConnectedChannel = {
                 let minimumDepth = serializedChannel.MinSafeDepth
                 let channelIndex = serializedChannel.ChannelIndex
                 let connectedChannel = {
-                    Account = account
+                    Account = channelStore.Account
                     ChannelWrapper = channelWrapperAfterReestablish
                     PeerWrapper = peerWrapperAfterReestablish
                     MinimumDepth = minimumDepth
@@ -182,11 +181,12 @@ type ConnectedChannel = {
                 return Ok connectedChannel
     }
 
-    static member AcceptFromWallet (transportListener: TransportListener)
+    static member AcceptFromWallet (channelStore: ChannelStore)
+                                   (transportListener: TransportListener)
                                    (channelId: ChannelId)
                                        : Async<Result<ConnectedChannel, ReconnectError>> = async {
-        let! serializedChannel, account, channelWrapper =
-            ConnectedChannel.LoadChannel transportListener.NodeSecret channelId
+        let! serializedChannel, channelWrapper =
+            ConnectedChannel.LoadChannel channelStore transportListener.NodeSecret channelId
         let! connectRes =
             let nodeId = channelWrapper.RemoteNodeId
             PeerWrapper.AcceptFromTransportListener
@@ -203,7 +203,7 @@ type ConnectedChannel = {
                 let minimumDepth = serializedChannel.MinSafeDepth
                 let channelIndex = serializedChannel.ChannelIndex
                 let connectedChannel = {
-                    Account = account
+                    Account = channelStore.Account
                     ChannelWrapper = channelWrapperAfterReestablish
                     PeerWrapper = peerWrapperAfterReestablish
                     MinimumDepth = minimumDepth
@@ -213,16 +213,17 @@ type ConnectedChannel = {
     }
 
     member this.SaveToWallet() =
+        let channelStore = ChannelStore this.Account
         let serializedChannel = {
             ChannelIndex = this.ChannelIndex
             Network = this.ChannelWrapper.Network
-            RemoteNodeId = this.PeerWrapper.RemoteNodeId.Value
+            RemoteNodeId = this.PeerWrapper.RemoteNodeId
             ChanState = this.ChannelWrapper.Channel.State
             AccountFileName = this.Account.AccountFile.Name
             CounterpartyIP = this.PeerWrapper.RemoteEndPoint
             MinSafeDepth = this.MinimumDepth
         }
-        serializedChannel.SaveToWallet()
+        channelStore.SaveChannel serializedChannel
 
     member this.RemoteNodeId
         with get(): NodeId = this.ChannelWrapper.RemoteNodeId

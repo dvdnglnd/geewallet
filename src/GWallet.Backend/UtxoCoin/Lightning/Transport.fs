@@ -7,7 +7,6 @@ open System.Diagnostics
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Peer
 
 open GWallet.Backend
@@ -161,7 +160,7 @@ type TransportStream = {
         | Ok () ->
             let stream = client.GetStream()
 
-            let peer = Peer.CreateOutbound(peerId, peerNodeId, nodeSecretKey)
+            let peer = Peer.CreateOutbound(peerId, peerNodeId.DnlNodeId, nodeSecretKey)
             let act1, peerEncryptor = PeerChannelEncryptor.getActOne peer.ChannelEncryptor
             Debug.Assert((TransportStream.bolt08ActOneLength = act1.Length), "act1 has wrong length")
             let peerAfterAct1 = { peer with ChannelEncryptor = peerEncryptor }
@@ -238,10 +237,12 @@ type TransportStream = {
 
     member this.RemoteNodeId
         with get(): NodeId =
-            UnwrapOption
-                this.Peer.TheirNodeId
-                "The TransportStream type is created by performing a handshake \
-                and in doing so guarantees that the peer's node id is known"
+            match this.Peer.TheirNodeId with
+            | Some nodeId -> NodeId.FromDnl nodeId
+            | None -> 
+                failwith
+                    "The TransportStream type is created by performing a handshake \
+                    and in doing so guarantees that the peer's node id is known"
 
     member this.PeerId
         with get(): PeerId = this.Peer.PeerId

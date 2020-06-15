@@ -6,7 +6,6 @@ open System.Net.Sockets
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 
 open GWallet.Backend

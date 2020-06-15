@@ -5,7 +5,6 @@ open System.Diagnostics
 
 open NBitcoin
 
-open DotNetLightning.Utils
 open DotNetLightning.Serialize.Msgs
 open DotNetLightning.Channel
 open DotNetLightning.Transactions
@@ -193,7 +192,7 @@ type FundedChannel = {
                             TemporaryChannelId = openChannelMsg.TemporaryChannelId
                             LocalParams = localParams
                             RemoteInit = peerWrapperAfterOpenChannel.Init
-                            ToLocal = LNMoney.MilliSatoshis 0L
+                            ToLocal = LNMoney 0L
                             ChannelKeys = channelKeys
                         }
                         ChannelCommand.CreateInbound inputInitFundee

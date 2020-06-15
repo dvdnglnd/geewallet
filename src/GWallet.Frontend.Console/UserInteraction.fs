@@ -6,8 +6,8 @@ open System.Linq
 open System.Globalization
 open System.Net
 
-open DotNetLightning.Utils
-open DotNetLightning.Channel
+//open DotNetLightning.Utils
+//open DotNetLightning.Channel
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.UtxoCoin.Lightning
@@ -23,10 +23,12 @@ type internal Operations =
     | ArchiveAccount          = 7
     | PairToWatchWallet       = 8
     | Options                 = 9
+    (*
     | OpenChannel             = 10
     | AcceptChannel           = 11
     | SendLightningPayment    = 12
     | ReceiveLightningPayment = 13
+    *)
 
 type WhichAccount =
     All of seq<IAccount> | MatchingWith of IAccount
@@ -86,6 +88,7 @@ module UserInteraction =
             ->
                 not noAccounts
         | Operations.CreateAccounts -> noAccounts
+        (*
         | Operations.OpenChannel
         | Operations.AcceptChannel
             -> not noAccounts
@@ -93,6 +96,7 @@ module UserInteraction =
             (Lightning.ListAvailableChannelIds true).Any()
         | Operations.ReceiveLightningPayment ->
             (Lightning.ListAvailableChannelIds false).Any()
+        *)
         | _ -> true
 
     let rec internal AskFileNameToLoad (askText: string): FileInfo =
@@ -268,6 +272,7 @@ module UserInteraction =
         | _ ->
             DisplayAccountStatusInner accountNumber account maybeBalance maybeUsdValue
 
+    (*
     let GetLightningBalance (channelState: IHasCommitments): decimal * decimal =
         let balance = channelState.Commitments.LocalCommit.Spec.ToLocal
         let channelReserve = channelState.Commitments.LocalParams.ChannelReserveSatoshis
@@ -355,6 +360,7 @@ module UserInteraction =
             yield! DisplayLightningChannelStatus channelId
         yield String.Empty
     }
+    *)
 
     let private GetAccountBalanceInner (account: IAccount): Async<IAccount*MaybeCached<decimal>*MaybeCached<decimal>> =
         async {
@@ -697,6 +703,7 @@ module UserInteraction =
                 | Some amountOption ->
                     AskParticularAmountOption balance amountOption
 
+    (*
     let rec AskLightningAmount (channelId: ChannelId): Option<TransferAmount> =
         let serializedChannel = SerializedChannel.LoadFromWallet channelId
         option {
@@ -756,6 +763,7 @@ module UserInteraction =
                     else
                         return TransferAmount(amountBtc, balanceBtc, Currency.BTC)
         }
+    *)
 
     let AskFee account amount destination: Option<IBlockchainFeeInfo> =
         try
@@ -818,67 +826,38 @@ module UserInteraction =
                 Console.WriteLine "Invalid account for use with lightning"
                 AskBitcoinAccount()
 
-    // Throws FormatException
-    let private AskIPAddress (msg: string): IPAddress =
+    let rec private Ask<'T> (parser: string -> 'T) (msg: string): Option<'T> =
         Console.Write msg
-        let ipString = Console.ReadLine().Trim()
-        IPAddress.Parse ipString
-
-    // Throws FormatException
-    let private ParsePortString(portString: string): int =
-        match UInt32.TryParse portString with
-        | false, _ ->
-            raise <| FormatException "Could not parse port number as unsigned 32-bit integer"
-        | true, portParsed ->
-            int portParsed
-
-    // Throws FormatException
-    let private AskPort (msg: string): int =
-        Console.Write msg
-        let portString = Console.ReadLine().Trim()
-        ParsePortString portString
-
-    // Throws FormatException
-    let private AskIPAddressAndPort (ipMsg: string) (portMsg: string): IPEndPoint =
-        IPEndPoint(AskIPAddress ipMsg, AskPort portMsg)
-
-    // Throws FormatException
-    let private AskChannelCounterpartyPubKey(): NBitcoin.PubKey =
-        Console.Write "Channel counterparty public key in hexadecimal notation: "
-        let pubkeyHex = Console.ReadLine().Trim()
-        NBitcoin.PubKey pubkeyHex
-
-    // Throws FormatException
-    let private AskChannelCounterpartyQRString(): IPEndPoint * NBitcoin.PubKey =
-        Console.Write "Channel counterparty QR connection string contents: "
-        let connectionString = Console.ReadLine().Trim()
-        let atIndex = connectionString.IndexOf "@"
-        if atIndex = -1 then
-            raise <| FormatException "No at-sign (@) in connection string, try again"
-        let pubKeyHex, ipPortCombo = connectionString.[..atIndex - 1], connectionString.[atIndex + 1..]
-        let portSeparatorIndex = ipPortCombo.LastIndexOf ':'
-        if portSeparatorIndex = -1 then
-            raise <| FormatException "No colon (:) after at-sign (@) in connection string, try again"
-        let ipString, portString = ipPortCombo.[..portSeparatorIndex - 1], ipPortCombo.[portSeparatorIndex + 1..]
-        let ipAddress = IPAddress.Parse ipString
-        let port: int = ParsePortString portString
-        IPEndPoint(ipAddress, port), NBitcoin.PubKey pubKeyHex
-
-    let AskChannelCounterpartyConnectionDetails(): Option<IPEndPoint * NBitcoin.PubKey> =
-        let useQRString = AskYesNo "Do you want to supply the channel counterparty connection string as used embedded in QR codes?"
-        try
-            if useQRString then
-                Some <| AskChannelCounterpartyQRString()
-            else
-                let ipEndpoint =
-                    AskIPAddressAndPort "Channel counterparty IP: " "Channel counterparty port: "
-                let pubKey = AskChannelCounterpartyPubKey()
-                Some (ipEndpoint, pubKey)
-        with
-        | :? FormatException as e ->
-            Presentation.Error e.Message
+        Console.Write ": "
+        let text = Console.ReadLine().Trim()
+        if text = "" then
             None
+        else
+            try
+                Some <| parser text
+            with
+            | :? FormatException as error ->
+                Console.WriteLine(sprintf "Invalid input. %s" error.Message)
+                Console.WriteLine("Try again or leave blank to abort.")
+                Ask parser msg
+    
+    let AskChannelCounterpartyConnectionDetails(): Option<LnEndPoint> =
+        let useQRString = AskYesNo "Do you want to supply the channel counterparty connection string as used embedded in QR codes?"
+        if useQRString then
+            Ask LnEndPoint.Parse "Channel counterparty QR connection string contents"
+        else
+            option {
+                let! ipAddress =
+                    Ask IPAddress.Parse "Channel counterparty IP"
+                let! port =
+                    Ask UInt16.Parse "Channel counterparty port"
+                let! nodeId =
+                    Ask NodeId.Parse "Channel counterparty public key in hexadecimal notation"
+                let ipEndPoint = IPEndPoint(ipAddress, int port)
+                return LnEndPoint.FromParts nodeId ipEndPoint
+            }
 
+    (*
     let AskBindAddress(): IPEndPoint =
         let defaultIpAddress = "127.0.0.1"
         let defaultPort = 9735
@@ -918,4 +897,4 @@ module UserInteraction =
                 Some (channels.ElementAt index)
             else
                 None
-
+    *)
