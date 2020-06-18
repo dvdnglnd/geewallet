@@ -147,9 +147,6 @@ type OutgoingUnfundedChannel = {
     member this.MinimumDepth
         with get(): BlockHeightOffset32 = this.ConnectedChannel.MinimumDepth
 
-    member this.MinimumDepthUInt32: uint32 =
-        this.MinimumDepth.Value
-
     member this.ChannelId
         with get(): ChannelId = this.ConnectedChannel.ChannelId
 

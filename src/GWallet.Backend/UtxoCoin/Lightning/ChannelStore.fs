@@ -2,17 +2,72 @@ namespace GWallet.Backend.UtxoCoin.Lightning
 
 open System.IO
 
+open DotNetLightning.Channel
+
 open GWallet.Backend
 open GWallet.Backend.UtxoCoin
 open GWallet.Backend.FSharpUtil.UwpHacks
 
-(*
+type FundingBroadcastButNotLockedData = {
+    TxId: TxId
+    MinimumDepth: uint32
+} with
+    member this.GetRemainingConfirmations(): Async<uint32> =
+        async {
+            let! confirmationCount =
+                UtxoCoin.Server.Query
+                    Currency.BTC
+                    (UtxoCoin.QuerySettings.Default ServerSelectionMode.Fast)
+                    (UtxoCoin.ElectrumClient.GetConfirmations (this.TxId.ToString()))
+                    None
+            if confirmationCount < this.MinimumDepth then
+                let remainingConfirmations = this.MinimumDepth - confirmationCount
+                return remainingConfirmations
+            else
+                return 0u
+        }
+
+type ActiveData =
+    {
+        sentBtc: decimal
+
+    }
+    member
+
 type ChannelStatus =
-    | Active of ActiveChannelSummary
-    | Pending of PendingChannelSummary
-    | Funded of FundedChannelSummary
-    | Broken of BrokenChannelSummary
-*)
+    | FundingBroadcastButNotLocked of FundingBroadcastButNotLockedData
+    | Active
+    | Broken
+
+type ChannelInfo = {
+    ChannelId: ChannelId
+    IsFunder: bool
+    Balance: decimal
+    SpendableBalance: decimal
+    Capacity: decimal
+    MaxBalance: decimal
+    MinBalance: decimal
+    Status: ChannelStatus
+} with
+    static member internal FromSerializedChannel (serializedChannel: SerializedChannel)
+                                                     : ChannelInfo = {
+        ChannelId = serializedChannel.ChannelId
+        IsFunder = serializedChannel.IsFunder
+        BalanceBtc = serializedChannel.Balance().BTC |> decimal
+        SpendableBalanceBtc = serializedChannel.SpendableBalance().BTC |> decimal
+        Status =
+            match serializedChannel.ChanState with
+            | ChannelState.Normal _ -> ChannelStatus.Active
+            | ChannelState.WaitForFundingConfirmed waitForFundingConfirmedData ->
+                let txId = TxId.FromHash waitForFundingConfirmedData.Commitments.FundingScriptCoin.Outpoint.Hash
+                let minimumDepth = serializedChannel.MinSafeDepth.Value
+                let fundingBroadcastButNotLockedData = {
+                    TxId = txId
+                    MinimumDepth = minimumDepth
+                }
+                ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData
+            | _ -> ChannelStatus.Broken
+    }
 
 type ChannelStore(account: NormalUtxoAccount) =
     static member ChannelFilePrefix = "chan-"
@@ -74,4 +129,8 @@ type ChannelStore(account: NormalUtxoAccount) =
         if not this.ChannelDir.Exists then
             this.ChannelDir.Create()
         File.WriteAllText(fileName, json)
+
+    member this.ChannelInfo (channelId: ChannelId): ChannelInfo =
+        let serializedChannel = this.LoadChannel channelId
+        ChannelInfo.FromSerializedChannel serializedChannel
 

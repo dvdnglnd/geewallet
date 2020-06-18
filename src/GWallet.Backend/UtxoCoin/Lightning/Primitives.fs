@@ -20,6 +20,9 @@ type NodeId internal (dnlNodeId: DotNetLightning.Utils.Primitives.NodeId) =
     static member internal FromDnl (dnlNodeId: DotNetLightning.Utils.Primitives.NodeId) =
         NodeId dnlNodeId
 
+    static member internal FromPubKey (pubKey: NBitcoin.PubKey): NodeId =
+        NodeId (DotNetLightning.Utils.Primitives.NodeId pubKey)
+
     static member Parse (text: string): NodeId =
         text
         |> NBitcoin.PubKey
@@ -113,13 +116,34 @@ type ChannelId = internal {
 
     override this.ToString() = this.DnlChannelId.Value.ToString()
 
+module ChannelId =
+    let ToString (channelId: ChannelId): string = channelId.ToString()
+
+type TxId = internal {
+    DnlTxId: DotNetLightning.Utils.Primitives.TxId
+} with
+    (*
+    static member internal FromDnl (dnlTxId: DotNetLightning.Utils.Primitives.TxId)
+                                       : TxId =
+        { DnlTxId = dnlTxId }
+    *)
+
+    static member internal FromHash (txIdHash: NBitcoin.uint256): TxId =
+        { DnlTxId = DotNetLightning.Utils.Primitives.TxId txIdHash }
+
+    override this.ToString() = this.DnlTxId.Value.ToString()
+
+module TxId =
+    let FromDnl (dnlTxId: DotNetLightning.Utils.Primitives.TxId): TxId =
+        { DnlTxId = dnlTxId }
+    let ToString (txId: TxId) = txId.ToString()
+
 type internal HTLCId = DotNetLightning.Utils.Primitives.HTLCId
 type internal FeeRatePerKw = DotNetLightning.Utils.Primitives.FeeRatePerKw
 type internal LNMoney = DotNetLightning.Utils.LNMoney
 type internal BlockHeight = DotNetLightning.Utils.Primitives.BlockHeight
 type internal BlockHeightOffset16 = DotNetLightning.Utils.Primitives.BlockHeightOffset16
 type internal BlockHeightOffset32 = DotNetLightning.Utils.Primitives.BlockHeightOffset32
-type internal TxId = DotNetLightning.Utils.Primitives.TxId
 type internal PeerId = DotNetLightning.Utils.Primitives.PeerId
 type internal TxOutIndex = DotNetLightning.Utils.Primitives.TxOutIndex
 type internal TxIndexInBlock = DotNetLightning.Utils.Primitives.TxIndexInBlock
@@ -130,7 +154,6 @@ module Constructors =
     let internal BlockHeightOffset16 = DotNetLightning.Utils.Primitives.BlockHeightOffset16
     let internal BlockHeightOffset32 = DotNetLightning.Utils.Primitives.BlockHeightOffset32
     let internal LNMoney = DotNetLightning.Utils.LNMoney
-    let internal TxId = DotNetLightning.Utils.Primitives.TxId
     let internal PeerId = DotNetLightning.Utils.Primitives.PeerId
     let internal TxOutIndex = DotNetLightning.Utils.Primitives.TxOutIndex
     let internal TxIndexInBlock = DotNetLightning.Utils.Primitives.TxIndexInBlock

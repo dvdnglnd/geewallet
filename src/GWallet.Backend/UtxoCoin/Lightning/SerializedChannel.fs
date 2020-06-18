@@ -105,11 +105,35 @@ type SerializedChannel = {
             "A SerializedChannel is only created once a channel has started \
             being established and must therefore have an initial commitment"
 
+    member this.Capacity(): LNMoney =
+        let spec = serializedChannel.Commitments.LocalCommit.Spec
+        spec.ToLocal + spec.ToRemote
+
     member this.Balance(): LNMoney =
         this.Commitments.LocalCommit.Spec.ToLocal
 
     member this.SpendableBalance(): LNMoney =
         this.Commitments.SpendableBalance()
+
+    // How low the balance can go. A channel must maintain enough balance to
+    // cover the channel reserve. The funder must also keep enough in the
+    // channel to cover the closing fee.
+    member this.MinBalance(): LNMoney =
+        this.Balance() - this.SpendableBalance()
+
+    // How high the balance can go. The fundee will only be able to receive up
+    // to this amount before the funder no longer has enough funds to cover
+    // the channel reserve and closing fee.
+    member this.MaxBalance(): LNMoney =
+        let channelReserve =
+            LNMoney.FromMoney serializedChannel.Commitments.LocalParams.ChannelReserveSatoshis
+        let fee =
+            let feeRate = serializedChannel.Commitments.LocalCommit.Spec.FeeRatePerKw
+            let weight = COMMITMENT_TX_BASE_WEIGHT
+            LNMoney.FromMoney <| feeRate.ToFee weight
+        let totalReceivable = this.Capacity() - channelReserve - fee
+
+    member this.SpendableCapacity(): LnMoney =
 
     member this.ChannelId: ChannelId =
         ChannelId.FromDnl this.Commitments.ChannelId

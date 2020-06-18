@@ -86,7 +86,11 @@ type ChannelWrapper = {
     member this.FundingTxId
         with get(): Option<TxId> =
             match this.Channel.State.Commitments with
-            | Some commitments -> Some <| TxId commitments.FundingScriptCoin.Outpoint.Hash
+            | Some commitments ->
+                commitments.FundingScriptCoin.Outpoint.Hash
+                |> DotNetLightning.Utils.Primitives.TxId
+                |> TxId.FromDnl
+                |> Some
             | None -> None
 
     member this.FundingScriptCoin

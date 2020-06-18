@@ -52,15 +52,15 @@ let OpenChannel(): Async<unit> = async {
                 if acceptFeeRate then
                     let password = UserInteraction.AskPassword false
                     let bindAddress = IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
-                    let lightningNode = LightningNode.Start channelStore password bindAddress
-                    let! outgoingUnfundedChannelRes =
+                    use lightningNode = LightningNode.Start channelStore password bindAddress
+                    let! pendingChannelRes =
                         LightningNode.OpenChannel
                             lightningNode
                             lnEndPoint
                             channelCapacity
                             metadata
                             password
-                    match outgoingUnfundedChannelRes with
+                    match pendingChannelRes with
                     | Error nodeOpenChannelError ->
                         Console.WriteLine (sprintf "Error opening channel: %s" nodeOpenChannelError.Message)
                         if nodeOpenChannelError.PossibleBug then
@@ -70,8 +70,8 @@ let OpenChannel(): Async<unit> = async {
                                     (lnEndPoint.ToString())
                                     nodeOpenChannelError.Message
                             Infrastructure.ReportWarningMessage msg
-                    | Ok outgoingUnfundedChannel ->
-                        let minimumDepth = outgoingUnfundedChannel.MinimumDepthUInt32
+                    | Ok pendingChannel ->
+                        let minimumDepth = pendingChannel.MinimumDepth
                         Console.WriteLine(
                             sprintf
                                 "Opening a channel with this party will require %i confirmations (~%i minutes)"
@@ -80,194 +80,220 @@ let OpenChannel(): Async<unit> = async {
                         )
                         let acceptMinimumDepth = UserInteraction.AskYesNo "Do you accept?"
                         if acceptMinimumDepth then
-                            let! fundedChannelRes = FundedChannel.FundChannel outgoingUnfundedChannel
-                            match fundedChannelRes with
+                            let! txIdRes = pendingChannel.Accept()
+                            match txIdRes with
                             | Error fundChannelError ->
                                 Console.WriteLine(sprintf "Error funding channel: %s" fundChannelError.Message)
                                 if fundChannelError.PossibleBug then
                                     let msg =
                                         sprintf
-                                            "Error funding channel with peer:%s@%s:%i: %s"
+                                            "Error funding channel with peer %s: %s"
                                             (lnEndPoint.ToString())
                                             fundChannelError.Message
                                     Infrastructure.ReportWarningMessage msg
-                            | Ok fundedChannel ->
-                                let txId = fundedChannel.FundingTxIdString
-                                let uri = BlockExplorer.GetTransaction Currency.BTC txId
+                            | Ok txId ->
+                                let txId: GWallet.Backend.UtxoCoin.Lightning.TxId = txId
+                                let uri = BlockExplorer.GetTransaction Currency.BTC (TxId.ToString txId)
                                 Console.WriteLine(sprintf "A funding transaction was broadcast: %A" uri)
-                                (fundedChannel :> IDisposable).Dispose()
             UserInteraction.PressAnyKeyToContinue()
 }
 
-(*
 let AcceptChannel(): Async<unit> = async {
     let account = UserInteraction.AskBitcoinAccount()
+    let channelStore = ChannelStore account
+    let bindAddress = UserInteraction.AskBindAddress()
     let password = UserInteraction.AskPassword false
-    let transportListener = BindLightning account password
-
-    let publicKey = transportListener.PublicKey
-    let ipEndPoint = transportListener.LocalEndpoint
-    Console.WriteLine(
-        sprintf
-            "This node, connect to it: %s@%s"
-            (publicKey.ToString())
-            (ipEndPoint.ToString())
-    )
-    let! acceptPeerRes = PeerWrapper.AcceptAnyFromTransportListener transportListener
-    match acceptPeerRes with
-    | FSharp.Core.Error connectError ->
-        Console.WriteLine(sprintf "Error accepting connection from peer: %s" connectError.Message)
-        if connectError.PossibleBug then
-            let msg =
-                sprintf
-                    "Error accepting connection: %s"
-                    connectError.Message
+    use lightningNode = LightningNode.Start channelStore password bindAddress
+    let lnEndPoint = LightningNode.LnEndPoint lightningNode
+    Console.WriteLine(sprintf "This node, connect to it: %s" (lnEndPoint.ToString()))
+    let! txIdRes = LightningNode.AcceptChannel lightningNode
+    match txIdRes with
+    | Error nodeAcceptChannelError ->
+        let msg =
+            (sprintf "Error accepting channel: %s" nodeAcceptChannelError.Message)
+        Console.WriteLine msg
+        if nodeAcceptChannelError.PossibleBug then
             Infrastructure.ReportWarningMessage msg
-    | FSharp.Core.Ok peerWrapper ->
-        let! fundedChannelRes = FundedChannel.AcceptChannel peerWrapper account
-        match fundedChannelRes with
-        | FSharp.Core.Error acceptChannelError ->
-            Console.WriteLine(sprintf "Error accepting channel: %s" acceptChannelError.Message)
-            if acceptChannelError.PossibleBug then
-                let msg =
-                    sprintf
-                        "Error accepting channel from peer:%s@%s:%i: %s"
-                        (peerWrapper.RemoteNodeId.Value.ToString())
-                        (peerWrapper.RemoteEndPoint.Address.ToString())
-                        peerWrapper.RemoteEndPoint.Port
-                        acceptChannelError.Message
-                Infrastructure.ReportWarningMessage msg
-        | FSharp.Core.Ok fundedChannel ->
-            Console.WriteLine(sprintf "Channel opened. Txid: %s" (fundedChannel.FundingTxId.ToString()))
-            Console.WriteLine "Waiting for funding locked."
-            (fundedChannel :> IDisposable).Dispose()
-    Lightning.StopLightning transportListener
+    | Ok txId ->
+        Console.WriteLine (sprintf "Channel opened. Txid: %s" (TxId.ToString txId))
+        Console.WriteLine "Waiting for funding locked."
     UserInteraction.PressAnyKeyToContinue()
 }
 
 let SendLightningPayment(): Async<unit> = async {
-    let channelIdOpt = UserInteraction.AskChannelId true
+    let account = UserInteraction.AskBitcoinAccount()
+    let channelStore = ChannelStore account
+    let channelIdOpt = UserInteraction.AskChannelId channelStore true
     match channelIdOpt with
     | None -> return ()
     | Some channelId ->
-        let amountOpt = option {
-            let! transferAmount = UserInteraction.AskLightningAmount channelId
-            let btcAmount = transferAmount.ValueToSend
-            let lnAmount = int64(btcAmount * decimal DotNetLightning.Utils.LNMoneyUnit.BTC)
-            return DotNetLightning.Utils.LNMoney lnAmount
-        }
-        match amountOpt with
+        let channelInfo = channelStore.ChannelInfo channelId
+        let transferAmountOpt = UserInteraction.AskLightningAmount channelInfo
+        match transferAmountOpt with
         | None -> ()
-        | Some amount ->
-            let account = Lightning.GetLightningChannelAccount channelId
+        | Some transferAmount ->
             let password = UserInteraction.AskPassword false
-            let nodeSecret = Lightning.GetLightningNodeSecret account password
-            let! connectRes = ActiveChannel.ConnectReestablish nodeSecret channelId
-            match connectRes with
-            | FSharp.Core.Error connectError ->
-                Console.WriteLine(sprintf "Error reestablishing channel: %s" connectError.Message)
-                if connectError.PossibleBug then
+            let bindAddress = IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
+            use lightningNode = LightningNode.Start channelStore password bindAddress
+            let! paymentRes = LightningNode.SendMonoHopPayment lightningNode channelId transferAmount
+            match paymentRes with
+            | Error nodeSendMonoHopPaymentError ->
+                Console.WriteLine(sprintf "Error sending monohop payment: %s" nodeSendMonoHopPaymentError.Message)
+                if nodeSendMonoHopPaymentError.PossibleBug then
                     let msg =
                         sprintf
-                            "Error reestablishing channel %s to send payment: %s"
-                            (channelId.Value.ToString())
-                            connectError.Message
+                            "Error sending monohop payment on channel %s: %s"
+                            (ChannelId.ToString channelId)
+                            nodeSendMonoHopPaymentError.Message
                     Infrastructure.ReportWarningMessage msg
-            | FSharp.Core.Ok activeChannel ->
-                let! paymentRes = activeChannel.SendMonoHopUnidirectionalPayment amount
-                match paymentRes with
-                | FSharp.Core.Error paymentError ->
-                    Console.WriteLine(sprintf "Error sending monohop payment: %s" paymentError.Message)
-                    if paymentError.PossibleBug then
-                        let msg =
-                            sprintf
-                                "Error sending payment on channel %s: %s"
-                                (channelId.Value.ToString())
-                                paymentError.Message
-                        Infrastructure.ReportWarningMessage msg
-                | FSharp.Core.Ok activeChannel ->
-                    (activeChannel :> IDisposable).Dispose()
-                    Console.WriteLine "Payment sent."
+            | Ok () ->
+                Console.WriteLine "Payment sent."
             UserInteraction.PressAnyKeyToContinue()
 }
 
 let ReceiveLightningPayment(): Async<unit> = async {
-    let channelIdOpt = UserInteraction.AskChannelId false
+    let account = UserInteraction.AskBitcoinAccount()
+    let channelStore = ChannelStore account
+    let channelIdOpt = UserInteraction.AskChannelId channelStore true
     match channelIdOpt with
     | None -> return ()
     | Some channelId ->
-        let account = Lightning.GetLightningChannelAccount channelId
+        let bindAddress = UserInteraction.AskBindAddress()
         let password = UserInteraction.AskPassword false
-        let transportListener = BindLightning account password
-        let! connectRes = ActiveChannel.AcceptReestablish transportListener channelId
-        match connectRes with
-        | FSharp.Core.Error connectError ->
-            Console.WriteLine(sprintf "Error reestablishing channel: %s" connectError.Message)
-            if connectError.PossibleBug then
+        use lightningNode = LightningNode.Start channelStore password bindAddress
+
+        let! receivePaymentRes =
+            LightningNode.ReceiveMonoHopPayment lightningNode channelId
+        match receivePaymentRes with
+        | Error nodeReceiveMonoHopPaymentError ->
+            Console.WriteLine(sprintf "Error receiving monohop payment: %s" nodeReceiveMonoHopPaymentError.Message)
+            if nodeReceiveMonoHopPaymentError.PossibleBug then
                 let msg =
                     sprintf
-                        "Error reestablishing channel %s to receive payment: %s"
-                        (channelId.Value.ToString())
-                        connectError.Message
+                        "Error receiving payment on channel %s: %s"
+                        (ChannelId.ToString channelId)
+                        nodeReceiveMonoHopPaymentError.Message
                 Infrastructure.ReportWarningMessage msg
-        | FSharp.Core.Ok activeChannel ->
-            let! paymentRes = activeChannel.RecvMonoHopUnidirectionalPayment()
-            match paymentRes with
-            | FSharp.Core.Error paymentError ->
-                Console.WriteLine(sprintf "Error receiving monohop payment: %s" paymentError.Message)
-                if paymentError.PossibleBug then
-                    let msg =
-                        sprintf
-                            "Error receiving payment on channel %s: %s"
-                            (channelId.Value.ToString())
-                            paymentError.Message
-                    Infrastructure.ReportWarningMessage msg
-            | FSharp.Core.Ok activeChannel ->
-                (activeChannel :> IDisposable).Dispose()
-                Console.WriteLine "Payment received."
-        Lightning.StopLightning transportListener
+        | Ok () ->
+            Console.WriteLine "Payment received."
         UserInteraction.PressAnyKeyToContinue()
 }
 
-let LockChannelsIfFundingConfirmed(): Async<unit> = async {
-    let channelIds = List.ofSeq (SerializedChannel.ListSavedChannels())
-    for channelId in channelIds do
-        let serializedChannel = SerializedChannel.LoadFromWallet channelId
-        let! status = Lightning.GetSerializedChannelStatus serializedChannel
-        match status with
-        | Lightning.ChannelStatus.FundingConfirmed ->
-            Console.WriteLine(sprintf "Funding for channel %s confirmed" (channelId.ToString()))
-            Console.WriteLine "In order to continue the funding for the channel needs to be locked"
-            let account = Lightning.GetLightningChannelAccount channelId
-            let password = UserInteraction.AskPassword false
-            let! activeChannelRes =
-                if serializedChannel.IsFunder then
-                    Console.WriteLine
-                        "Ensure the fundee is ready to accept a connection to lock the funding, \
-                        then press any key to continue."
-                    Console.ReadKey true |> ignore
-                    let nodeSecret = Lightning.GetLightningNodeSecret account password
-                    ActiveChannel.ConnectReestablish nodeSecret channelId
-                else
-                    Console.WriteLine "Listening for connection from peer"
-                    let transportListener = BindLightning account password
-                    ActiveChannel.AcceptReestablish transportListener channelId
-            match activeChannelRes with
-            | FSharp.Core.Ok activeChannel ->
-                (activeChannel :> IDisposable).Dispose()
-                Console.WriteLine(sprintf "funding locked for channel %s" (channelId.ToString()))
-            | FSharp.Core.Error connectError ->
-                Console.WriteLine(sprintf "Error reestablishing channel: %s" connectError.Message)
-                if connectError.PossibleBug then
-                    let msg =
-                        sprintf
-                            "Error reestablishing channel %s to lock funding: %s"
-                            (channelId.Value.ToString())
-                            connectError.Message
-                    Infrastructure.ReportWarningMessage msg
-        | _ -> ()
+let LockChannel (channelInfo: ChannelInfo)
+                (fundingBroadcastButNotLockedData: FundingBroadcastButNotLockedData)
+                    : Async<ChannelInfo> =
+    Console.WriteLine(sprintf "Funding for channel %s confirmed" (ChannelId.ToString channelId))
+    Console.WriteLine "In order to continue the funding for the channel needs to be locked"
+    let bindAddress =
+        if channelInfo.IsFunder then
+            Console.WriteLine
+                "Ensure the fundee is ready to accept a connection to lock the funding, \
+                then press any key to continue."
+            Console.ReadKey true |> ignore
+            IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
+        else
+            Console.WriteLine "Listening for connection from peer"
+            UserInteraction.AskBindAddress()
+    let password = UserInteraction.AskPassword false
+    use lightningNode = LightningNode.Start channelStore password bindAddress
+    async {
+        let! lockFundingRes = LightningNode.LockChannelFunding lightningNode channelId
+        match lockFundingRes with
+        | Error lockFundingError ->
+            Console.WriteLine(sprintf "Error reestablishing channel: %s" lockFundingError.Message)
+            if lockFundingError.PossibleBug then
+                let msg =
+                    sprintf
+                        "Error reestablishing channel %s to lock funding: %s"
+                        (ChannelId.ToString channelId)
+                        lockFundingError.Message
+                Infrastructure.ReportWarningMessage msg
+        | Ok () ->
+            Console.WriteLine(sprintf "funding locked for channel %s" (ChannelId.ToString channelId))
+        return channelInfo
+    }
+
+let LockChannelIfFundingConfirmed (channelInfo: ChannelInfo)
+                                  (fundingBroadcastButNotLockedData: FundingBroadcastButNotLockedData)
+                                      : Async<unit -> Async<ChannelInfo>> = async {
+    let! remainingConfirmations = fundingBroadcastButNotLockedData.GetRemainingConfirmations()
+    if remainingConfirmations = 0u then
+        LockChannel
+    else
+        fun () -> async {
+            return channelInfo
+        }
 }
-*)
+
+let GetChannelStatuses (accounts: seq<IAccount>): seq<Async<unit -> Async<ChannelInfo>>> = seq {
+    let normalUtxoAccounts = accounts.OfType<UtxoCoin.NormalUtxoAccount>()
+    for account in normalUtxoAccounts do
+        let channelStore = ChannelStore account
+        let channelIds = channelStore.ListChannelIds()
+        for channelId in channelIds do
+            let channelInfo = channelStore.ChannelInfo channelId
+            yield
+                match channelInfo.Status with
+                | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
+                    LockChannelIfFundingConfirmed fundingBroadcastButNotLockedData
+                | _ ->
+                    fun () -> async {
+                        return channelInfo
+                    }
+}
+
+let GetChannelStatusesAndLockFunding(): Async<array<ChannelInfo>> = async {
+    let channelStatusJobs: seq<Async<unit -> Async<ChannelInfo>>> = GetChannelStatuses()
+    let! channelInfoInteractions: array<unit -> Async<ChannelInfo>> = Async.Parallel channelStatusJobs
+    for channelInfoInteraction in channelInfoInteractions do
+        let! channelInfo = channelInfoInteraction()
+        
+
+        
+    
+        for channelInfo in channelStatues do
+            match channelInfo.Status with
+            | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
+                let! remainingConfirmations = fundingBroadcastButNotLockedData.GetRemainingConfirmations()
+                if remainingConfirmations = 0u then
+                    Console.WriteLine(sprintf "Funding for channel %s confirmed" (ChannelId.ToString channelId))
+                    Console.WriteLine "In order to continue the funding for the channel needs to be locked"
+                    let bindAddress =
+                        if channelInfo.IsFunder then
+                            Console.WriteLine
+                                "Ensure the fundee is ready to accept a connection to lock the funding, \
+                                then press any key to continue."
+                            Console.ReadKey true |> ignore
+                            IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
+                        else
+                            Console.WriteLine "Listening for connection from peer"
+                            UserInteraction.AskBindAddress()
+                    let password = UserInteraction.AskPassword false
+                    use lightningNode = LightningNode.Start channelStore password bindAddress
+                    let! lockFundingRes = LightningNode.LockChannelFunding lightningNode channelId
+                    match lockFundingRes with
+                    | Error lockFundingError ->
+                        Console.WriteLine(sprintf "Error reestablishing channel: %s" lockFundingError.Message)
+                        if lockFundingError.PossibleBug then
+                            let msg =
+                                sprintf
+                                    "Error reestablishing channel %s to lock funding: %s"
+                                    (ChannelId.ToString channelId)
+                                    lockFundingError.Message
+                            Infrastructure.ReportWarningMessage msg
+                    | Ok () ->
+                        Console.WriteLine(sprintf "funding locked for channel %s" (ChannelId.ToString channelId))
+
+    }
+    let jobs = seq {
+                match channelInfo.Status with
+                | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
+                | _ -> ()
+    }
+
+let CheckLightningChannelStatuses(): Async<array<ChannelInfo>> = async {
+
+}
 
 let rec TrySendAmount (account: NormalAccount) transactionMetadata destination amount =
     let password = UserInteraction.AskPassword false
@@ -592,7 +618,6 @@ let rec PerformOperation (numAccounts: int): unit =
         PairToWatchWallet()
     | Operations.Options ->
         WalletOptions()
-    (*
     | Operations.OpenChannel ->
         OpenChannel() |> Async.RunSynchronously
     | Operations.AcceptChannel ->
@@ -601,7 +626,6 @@ let rec PerformOperation (numAccounts: int): unit =
         SendLightningPayment() |> Async.RunSynchronously
     | Operations.ReceiveLightningPayment ->
         ReceiveLightningPayment() |> Async.RunSynchronously
-    *)
     | _ -> failwith "Unreachable"
 
 let rec GetAccountOfSameCurrency currency =
@@ -641,20 +665,24 @@ let rec CheckArchivedAccountsAreEmpty(): bool =
 
 let rec ProgramMainLoop() =
     let accounts = Account.GetAllActiveAccounts()
+    let channelStatusJobs: seq<Async<unit -> Async<ChannelInfo>>> = GetChannelStatuses accounts
+    let channelInfoInteractionsJob: Async<array<unit -> Async<ChannelInfo>>> = Async.Parallel channelStatusJobs
+    let displayAccountStatusesJob = 
+        UserInteraction.DisplayAccountStatuses(WhichAccount.All accounts)
+    let jobs = [| channelInfoInteractionsJob; displayAccountStatusesJob |]
+    let [| channelInfoInteractions; accountStatusesLines |] =
+        jobs
+        |> Async.Parallel
+        |> Async.RunSynchronously
+
     Console.WriteLine ()
     Console.WriteLine "*** STATUS ***"
-    let lines = seq {
-        yield!
-            UserInteraction.DisplayAccountStatuses(WhichAccount.All accounts)
-                |> Async.RunSynchronously
-        //yield! UserInteraction.DisplayLightningChannelStatuses()
-    }
-    Console.WriteLine(String.concat Environment.NewLine lines)
-
-    (*
-    LockChannelsIfFundingConfirmed()
-        |> Async.RunSynchronously
-    *)
+    Console.WriteLine(String.concat Environment.NewLine accountStatusesLines)
+    for channelInfoInteraction in channelInfoInteractions do
+        let channelInfo =
+            channelInfoInteraction()
+            |> Async.RunSyncronously
+        UserInteraction.DisplayLightningChannelStatus channelInfo
 
     if CheckArchivedAccountsAreEmpty() then
         PerformOperation (accounts.Count())

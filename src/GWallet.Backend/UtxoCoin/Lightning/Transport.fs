@@ -94,11 +94,17 @@ type TransportListener = {
             Listener = listener
         }
 
-    member this.PublicKey
-        with get(): PubKey = this.NodeSecret.PrivateKey.PubKey
+    member this.PubKey: PubKey =
+        this.NodeSecret.PrivateKey.PubKey
 
-    member this.LocalEndpoint
-        with get(): IPEndPoint = this.Listener.LocalEndpoint :?> IPEndPoint
+    member this.IPEndPoint: IPEndPoint =
+        this.Listener.LocalEndpoint :?> IPEndPoint
+
+    member this.NodeId: NodeId =
+        NodeId.FromPubKey this.PubKey
+
+    member this.LnEndPoint: LnEndPoint =
+        LnEndPoint.FromParts this.NodeId this.IPEndPoint
 
 type TransportStream = {
     NodeSecret: ExtKey

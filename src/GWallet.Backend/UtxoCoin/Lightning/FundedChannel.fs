@@ -274,14 +274,14 @@ type FundedChannel = {
 
     member this.GetConfirmations(): Async<BlockHeightOffset32> = async {
         let! confirmationCount =
-            let txId = this.FundingTxId.Value.ToString()
+            let txId = this.FundingTxId.ToString()
             QueryBTCFast (ElectrumClient.GetConfirmations txId)
         return confirmationCount |> BlockHeightOffset32
     }
 
     member this.GetLocationOnChain(): Async<BlockHeight * TxIndexInBlock> = async {
         let fundingScriptCoin = this.FundingScriptCoin
-        let txIdHex: string = this.ConnectedChannel.FundingTxId.Value.ToString()
+        let txIdHex: string = this.ConnectedChannel.FundingTxId.ToString()
         let fundingDestination: TxDestination = fundingScriptCoin.ScriptPubKey.GetDestination()
         let fundingAddress: BitcoinAddress = fundingDestination.GetAddress Config.BitcoinNet
         let fundingAddressString: string = fundingAddress.ToString()
