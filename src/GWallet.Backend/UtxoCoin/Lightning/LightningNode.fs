@@ -50,9 +50,9 @@ type NodeReceiveMonoHopPaymentError =
     member this.Message =
         match this with
         | Reconnect reconnectActiveChannelError -> 
-            SPrintF1 "error reconnecting channel: %s" reconnectActiveChannelError
+            SPrintF1 "error reconnecting channel: %s" reconnectActiveChannelError.Message
         | ReceivePayment recvMonoHopPaymentError ->
-            SPrintF1 "error receiving payment on reconnected channel: %s" recvMonoHopPaymentError
+            SPrintF1 "error receiving payment on reconnected channel: %s" recvMonoHopPaymentError.Message
 
 type PendingChannel internal (outgoingUnfundedChannel: OutgoingUnfundedChannel) =
     member internal this.OutgoingUnfundedChannel = outgoingUnfundedChannel
