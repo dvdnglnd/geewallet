@@ -102,17 +102,20 @@ and PeerWrapper = {
             }
     }
 
-    member this.RemoteNodeId
-        with get(): NodeId = this.MsgStream.RemoteNodeId
+    member this.RemoteNodeId: NodeId =
+        this.MsgStream.RemoteNodeId
 
-    member this.PeerId
-        with get(): PeerId = this.MsgStream.PeerId
+    member this.PeerId: PeerId =
+        this.MsgStream.PeerId
 
-    member this.RemoteEndPoint
-        with get(): IPEndPoint = this.MsgStream.RemoteEndPoint
+    member this.RemoteEndPoint: IPEndPoint =
+        this.MsgStream.RemoteEndPoint
 
-    member this.NodeSecret
-        with get(): ExtKey = this.MsgStream.NodeSecret
+    member this.LnEndPoint: LnEndPoint =
+        this.MsgStream.LnEndPoint
+
+    member this.NodeSecret: ExtKey =
+        this.MsgStream.NodeSecret
 
     member this.SendMsg (msg: ILightningMsg): Async<PeerWrapper> = async {
         let! msgStream = this.MsgStream.SendMsg msg

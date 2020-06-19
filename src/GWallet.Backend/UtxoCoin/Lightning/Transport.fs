@@ -258,6 +258,9 @@ type TransportStream = {
     member this.RemoteEndPoint
         with get(): IPEndPoint = this.Client.Client.RemoteEndPoint :?> IPEndPoint
 
+    member this.LnEndPoint: LnEndPoint =
+        LnEndPoint.FromParts this.RemoteNodeId this.RemoteEndPoint
+
     member this.SendBytes (plaintext: array<byte>): Async<TransportStream> = async {
         let peer = this.Peer
         let ciphertext, channelEncryptor =

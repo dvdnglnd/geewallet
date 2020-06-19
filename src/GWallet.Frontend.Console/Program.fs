@@ -54,13 +54,6 @@ let OpenChannel(): Async<unit> = async {
                     match pendingChannelRes with
                     | Error nodeOpenChannelError ->
                         Console.WriteLine (sprintf "Error opening channel: %s" nodeOpenChannelError.Message)
-                        if nodeOpenChannelError.PossibleBug then
-                            let msg =
-                                sprintf
-                                    "Error opening channel with peer %s: %s"
-                                    (lnEndPoint.ToString())
-                                    nodeOpenChannelError.Message
-                            Infrastructure.ReportWarningMessage msg
                     | Ok pendingChannel ->
                         let minimumDepth = pendingChannel.MinimumDepth
                         Console.WriteLine(
@@ -75,13 +68,6 @@ let OpenChannel(): Async<unit> = async {
                             match txIdRes with
                             | Error fundChannelError ->
                                 Console.WriteLine(sprintf "Error funding channel: %s" fundChannelError.Message)
-                                if fundChannelError.PossibleBug then
-                                    let msg =
-                                        sprintf
-                                            "Error funding channel with peer %s: %s"
-                                            (lnEndPoint.ToString())
-                                            fundChannelError.Message
-                                    Infrastructure.ReportWarningMessage msg
                             | Ok txId ->
                                 let txId: TxId = txId
                                 let uri = BlockExplorer.GetTransaction Currency.BTC (TxId.ToString txId)
@@ -100,11 +86,8 @@ let AcceptChannel(): Async<unit> = async {
     let! txIdRes = LightningNode.AcceptChannel lightningNode
     match txIdRes with
     | Error nodeAcceptChannelError ->
-        let msg =
+        Console.WriteLine
             (sprintf "Error accepting channel: %s" nodeAcceptChannelError.Message)
-        Console.WriteLine msg
-        if nodeAcceptChannelError.PossibleBug then
-            Infrastructure.ReportWarningMessage msg
     | Ok txId ->
         Console.WriteLine (sprintf "Channel opened. Txid: %s" (TxId.ToString txId))
         Console.WriteLine "Waiting for funding locked."
@@ -130,13 +113,6 @@ let SendLightningPayment(): Async<unit> = async {
             match paymentRes with
             | Error nodeSendMonoHopPaymentError ->
                 Console.WriteLine(sprintf "Error sending monohop payment: %s" nodeSendMonoHopPaymentError.Message)
-                if nodeSendMonoHopPaymentError.PossibleBug then
-                    let msg =
-                        sprintf
-                            "Error sending monohop payment on channel %s: %s"
-                            (ChannelId.ToString channelId)
-                            nodeSendMonoHopPaymentError.Message
-                    Infrastructure.ReportWarningMessage msg
             | Ok () ->
                 Console.WriteLine "Payment sent."
             UserInteraction.PressAnyKeyToContinue()
@@ -158,13 +134,6 @@ let ReceiveLightningPayment(): Async<unit> = async {
         match receivePaymentRes with
         | Error nodeReceiveMonoHopPaymentError ->
             Console.WriteLine(sprintf "Error receiving monohop payment: %s" nodeReceiveMonoHopPaymentError.Message)
-            if nodeReceiveMonoHopPaymentError.PossibleBug then
-                let msg =
-                    sprintf
-                        "Error receiving payment on channel %s: %s"
-                        (ChannelId.ToString channelId)
-                        nodeReceiveMonoHopPaymentError.Message
-                Infrastructure.ReportWarningMessage msg
         | Ok () ->
             Console.WriteLine "Payment received."
         UserInteraction.PressAnyKeyToContinue()
@@ -193,13 +162,6 @@ let LockChannel (channelStore: ChannelStore)
         match lockFundingRes with
         | Error lockFundingError ->
             Console.WriteLine(sprintf "Error reestablishing channel: %s" lockFundingError.Message)
-            if lockFundingError.PossibleBug then
-                let msg =
-                    sprintf
-                        "Error reestablishing channel %s to lock funding: %s"
-                        (ChannelId.ToString channelId)
-                        lockFundingError.Message
-                Infrastructure.ReportWarningMessage msg
         | Ok () ->
             Console.WriteLine(sprintf "funding locked for channel %s" (ChannelId.ToString channelId))
         return seq {

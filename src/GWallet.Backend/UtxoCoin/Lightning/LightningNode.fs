@@ -22,10 +22,6 @@ type NodeOpenChannelError =
             SPrintF1 "error connecting: %s" connectError.Message
         | OpenChannel openChannelError ->
             SPrintF1 "error opening channel: %s" openChannelError.Message
-    member this.PossibleBug =
-        match this with
-        | Connect connectError -> connectError.PossibleBug
-        | OpenChannel openChannelError -> openChannelError.PossibleBug
 
 type NodeAcceptChannelError =
     | AcceptPeer of ConnectError
@@ -37,10 +33,6 @@ type NodeAcceptChannelError =
             SPrintF1 "error accepting connection: %s" connectError.Message
         | AcceptChannel acceptChannelError ->
             SPrintF1 "error accepting channel: %s" acceptChannelError.Message
-    member this.PossibleBug =
-        match this with
-        | AcceptPeer connectError -> connectError.PossibleBug
-        | AcceptChannel acceptChannelError -> acceptChannelError.PossibleBug
 
 type NodeSendMonoHopPaymentError =
     | Reconnect of ReconnectActiveChannelError
@@ -51,10 +43,6 @@ type NodeSendMonoHopPaymentError =
             SPrintF1 "error reconnecting channel: %s" reconnectActiveChannelError.Message
         | SendPayment sendMonoHopPaymentError ->
             SPrintF1 "error sending payment on reconnected channel: %s" sendMonoHopPaymentError.Message
-    member this.PossibleBug =
-        match this with
-        | Reconnect reconnectActiveChannelError -> reconnectActiveChannelError.PossibleBug
-        | SendPayment sendMonoHopPaymentError -> sendMonoHopPaymentError.PossibleBug
 
 type NodeReceiveMonoHopPaymentError =
     | Reconnect of ReconnectActiveChannelError
@@ -65,10 +53,6 @@ type NodeReceiveMonoHopPaymentError =
             SPrintF1 "error reconnecting channel: %s" reconnectActiveChannelError
         | ReceivePayment recvMonoHopPaymentError ->
             SPrintF1 "error receiving payment on reconnected channel: %s" recvMonoHopPaymentError
-    member this.PossibleBug =
-        match this with
-        | Reconnect reconnectActiveChannelError -> reconnectActiveChannelError.PossibleBug
-        | ReceivePayment recvMonoHopPaymentError -> recvMonoHopPaymentError.PossibleBug
 
 type PendingChannel internal (outgoingUnfundedChannel: OutgoingUnfundedChannel) =
     member internal this.OutgoingUnfundedChannel = outgoingUnfundedChannel
@@ -78,7 +62,11 @@ type PendingChannel internal (outgoingUnfundedChannel: OutgoingUnfundedChannel) 
         let! fundedChannelRes =
             FundedChannel.FundChannel this.OutgoingUnfundedChannel
         match fundedChannelRes with
-        | Error fundChannelError -> return Error fundChannelError
+        | Error fundChannelError ->
+            if fundChannelError.PossibleBug then
+                let msg = SPrintF1 "Error funding channel: %s" fundChannelError.Message
+                Infrastructure.ReportWarningMessage msg
+            return Error fundChannelError
         | Ok fundedChannel ->
             let txId = fundedChannel.FundingTxId
             (fundedChannel :> IDisposable).Dispose()
@@ -122,6 +110,14 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
             PeerWrapper.Connect this.SecretKey lnEndPoint.NodeId peerId
         match connectRes with
         | Error connectError ->
+            if connectError.PossibleBug then
+                let msg =
+                    SPrintF3
+                        "error connecting to peer %s to open channel of capacity %M: %s"
+                        (lnEndPoint.ToString())
+                        channelCapacity.ValueToSend
+                        connectError.Message
+                Infrastructure.ReportWarningMessage msg
             return Error <| NodeOpenChannelError.Connect connectError
         | Ok peerWrapper ->
             let! outgoingUnfundedChannelRes =
@@ -133,6 +129,14 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                     password
             match outgoingUnfundedChannelRes with
             | Error openChannelError ->
+                if openChannelError.PossibleBug then
+                    let msg =
+                        SPrintF3
+                            "error opening channel with peer %s of capacity %M: %s"
+                            (lnEndPoint.ToString())
+                            channelCapacity.ValueToSend
+                            openChannelError.Message
+                    Infrastructure.ReportWarningMessage msg
                 return Error <| NodeOpenChannelError.OpenChannel openChannelError
             | Ok outgoingUnfundedChannel ->
                 return Ok <| PendingChannel outgoingUnfundedChannel
@@ -143,11 +147,24 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
             PeerWrapper.AcceptAnyFromTransportListener this.TransportListener
         match acceptPeerRes with
         | Error connectError ->
+            if connectError.PossibleBug then
+                let msg =
+                    SPrintF1
+                        "error accepting connection from peer to accept channel: %s"
+                        connectError.Message
+                Infrastructure.ReportWarningMessage msg
             return Error <| NodeAcceptChannelError.AcceptPeer connectError
         | Ok peerWrapper ->
             let! fundedChannelRes = FundedChannel.AcceptChannel peerWrapper this.Account
             match fundedChannelRes with
             | Error acceptChannelError ->
+                if acceptChannelError.PossibleBug then
+                    let msg =
+                        SPrintF2
+                            "error accepting channel from peer %s: %s"
+                            (peerWrapper.LnEndPoint.ToString())
+                            acceptChannelError.Message
+                    Infrastructure.ReportWarningMessage msg
                 return Error <| NodeAcceptChannelError.AcceptChannel acceptChannelError
             | Ok fundedChannel ->
                 let txId = fundedChannel.FundingTxId
@@ -165,11 +182,25 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
         let! activeChannelRes = ActiveChannel.ConnectReestablish this.ChannelStore this.SecretKey channelId
         match activeChannelRes with
         | Error reconnectActiveChannelError ->
+            if reconnectActiveChannelError.PossibleBug then
+                let msg =
+                    SPrintF2
+                        "error connecting to peer to send monohop payment on channel %s: %s"
+                        (channelId.ToString())
+                        reconnectActiveChannelError.Message
+                Infrastructure.ReportWarningMessage msg
             return Error <| NodeSendMonoHopPaymentError.Reconnect reconnectActiveChannelError
         | Ok activeChannel ->
             let! paymentRes = activeChannel.SendMonoHopUnidirectionalPayment amount
             match paymentRes with
             | Error sendMonoHopPaymentError ->
+                if sendMonoHopPaymentError.PossibleBug then
+                    let msg =
+                        SPrintF2
+                            "error sending monohop payment on channel %s: %s"
+                            (channelId.ToString())
+                            sendMonoHopPaymentError.Message
+                    Infrastructure.ReportWarningMessage msg
                 return Error <| NodeSendMonoHopPaymentError.SendPayment sendMonoHopPaymentError
             | Ok activeChannelAfterPayment ->
                 (activeChannelAfterPayment :> IDisposable).Dispose()
@@ -181,11 +212,25 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
         let! activeChannelRes = ActiveChannel.AcceptReestablish this.ChannelStore this.TransportListener channelId
         match activeChannelRes with
         | Error reconnectActiveChannelError ->
+            if reconnectActiveChannelError.PossibleBug then
+                let msg =
+                    SPrintF2
+                        "error accepting connection from peer to receive monohop payment on channel %s: %s"
+                        (channelId.ToString())
+                        reconnectActiveChannelError.Message
+                Infrastructure.ReportWarningMessage msg
             return Error <| NodeReceiveMonoHopPaymentError.Reconnect reconnectActiveChannelError
         | Ok activeChannel ->
             let! paymentRes = activeChannel.RecvMonoHopUnidirectionalPayment()
             match paymentRes with
             | Error recvMonoHopPaymentError ->
+                if recvMonoHopPaymentError.PossibleBug then
+                    let msg =
+                        SPrintF2
+                            "error accepting monohop payment on channel %s: %s"
+                            (channelId.ToString())
+                            recvMonoHopPaymentError.Message
+                    Infrastructure.ReportWarningMessage msg
                 return Error <| NodeReceiveMonoHopPaymentError.ReceivePayment recvMonoHopPaymentError
             | Ok activeChannelAfterPaymentReceived ->
                 (activeChannelAfterPaymentReceived :> IDisposable).Dispose()
@@ -203,6 +248,13 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                     ActiveChannel.AcceptReestablish this.ChannelStore this.TransportListener channelId
             match activeChannelRes with
             | Error reconnectActiveChannelError ->
+                if reconnectActiveChannelError.PossibleBug then
+                    let msg =
+                        SPrintF2
+                            "error reconnecting to peer to lock channel %s: %s"
+                            (channelId.ToString())
+                            reconnectActiveChannelError.Message
+                    Infrastructure.ReportWarningMessage msg
                 return Error reconnectActiveChannelError
             | Ok activeChannel ->
                 (activeChannel :> IDisposable).Dispose()

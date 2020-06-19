@@ -143,6 +143,9 @@ type MsgStream = {
     member this.RemoteEndPoint
         with get(): IPEndPoint = this.TransportStream.RemoteEndPoint
 
+    member this.LnEndPoint: LnEndPoint =
+        this.TransportStream.LnEndPoint
+
     member this.NodeSecret
         with get(): ExtKey = this.TransportStream.NodeSecret
 
