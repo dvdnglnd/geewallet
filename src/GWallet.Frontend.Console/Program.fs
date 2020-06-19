@@ -4,22 +4,13 @@ open System.Linq
 open System.Text.RegularExpressions
 open System.Net
 
-//open DotNetLightning.Utils
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.UtxoCoin.Lightning
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 open GWallet.Frontend.Console
 
 let random = Org.BouncyCastle.Security.SecureRandom () :> Random
-
-(*
-let BindLightning (account: UtxoCoin.NormalUtxoAccount)
-                  (password: string)
-                       : TransportListener =
-    let nodeSecret = Lightning.GetLightningNodeSecret account password
-    let ipEndpoint = UserInteraction.AskBindAddress()
-    TransportListener.Bind nodeSecret ipEndpoint
-*)
 
 let OpenChannel(): Async<unit> = async {
     let account = UserInteraction.AskBitcoinAccount()
@@ -92,7 +83,7 @@ let OpenChannel(): Async<unit> = async {
                                             fundChannelError.Message
                                     Infrastructure.ReportWarningMessage msg
                             | Ok txId ->
-                                let txId: GWallet.Backend.UtxoCoin.Lightning.TxId = txId
+                                let txId: TxId = txId
                                 let uri = BlockExplorer.GetTransaction Currency.BTC (TxId.ToString txId)
                                 Console.WriteLine(sprintf "A funding transaction was broadcast: %A" uri)
             UserInteraction.PressAnyKeyToContinue()
@@ -179,9 +170,10 @@ let ReceiveLightningPayment(): Async<unit> = async {
         UserInteraction.PressAnyKeyToContinue()
 }
 
-let LockChannel (channelInfo: ChannelInfo)
-                (fundingBroadcastButNotLockedData: FundingBroadcastButNotLockedData)
-                    : Async<ChannelInfo> =
+let LockChannel (channelStore: ChannelStore)
+                (channelInfo: ChannelInfo)
+                    : Async<seq<string>> =
+    let channelId = channelInfo.ChannelId
     Console.WriteLine(sprintf "Funding for channel %s confirmed" (ChannelId.ToString channelId))
     Console.WriteLine "In order to continue the funding for the channel needs to be locked"
     let bindAddress =
@@ -210,88 +202,64 @@ let LockChannel (channelInfo: ChannelInfo)
                 Infrastructure.ReportWarningMessage msg
         | Ok () ->
             Console.WriteLine(sprintf "funding locked for channel %s" (ChannelId.ToString channelId))
-        return channelInfo
+        return seq {
+            yield! UserInteraction.DisplayLightningChannelStatus channelInfo
+            yield "        funding locked - channel is now active"
+        }
     }
 
-let LockChannelIfFundingConfirmed (channelInfo: ChannelInfo)
+let LockChannelIfFundingConfirmed (channelStore: ChannelStore)
+                                  (channelInfo: ChannelInfo)
                                   (fundingBroadcastButNotLockedData: FundingBroadcastButNotLockedData)
-                                      : Async<unit -> Async<ChannelInfo>> = async {
+                                      : Async<Async<seq<string>>> = async {
     let! remainingConfirmations = fundingBroadcastButNotLockedData.GetRemainingConfirmations()
     if remainingConfirmations = 0u then
-        LockChannel
+        return LockChannel channelStore channelInfo
     else
-        fun () -> async {
-            return channelInfo
+        return async {
+            return seq {
+                yield! UserInteraction.DisplayLightningChannelStatus channelInfo
+                yield sprintf "        waiting for %i more confirmations" remainingConfirmations
+            }
         }
 }
 
-let GetChannelStatuses (accounts: seq<IAccount>): seq<Async<unit -> Async<ChannelInfo>>> = seq {
+let GetChannelStatuses (accounts: seq<IAccount>): seq<Async<Async<seq<string>>>> = seq {
     let normalUtxoAccounts = accounts.OfType<UtxoCoin.NormalUtxoAccount>()
     for account in normalUtxoAccounts do
         let channelStore = ChannelStore account
         let channelIds = channelStore.ListChannelIds()
+        yield async {
+            return async {
+                return seq {
+                    yield sprintf "Lightning Status (%i channels)" (Seq.length channelIds)
+                }
+            }
+        }
         for channelId in channelIds do
             let channelInfo = channelStore.ChannelInfo channelId
             yield
                 match channelInfo.Status with
                 | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
-                    LockChannelIfFundingConfirmed fundingBroadcastButNotLockedData
-                | _ ->
-                    fun () -> async {
-                        return channelInfo
+                    LockChannelIfFundingConfirmed channelStore channelInfo fundingBroadcastButNotLockedData
+                | ChannelStatus.Active ->
+                    async {
+                        return async {
+                            return seq {
+                                yield! UserInteraction.DisplayLightningChannelStatus channelInfo
+                                yield "        channel is active"
+                            }
+                        }
                     }
-}
-
-let GetChannelStatusesAndLockFunding(): Async<array<ChannelInfo>> = async {
-    let channelStatusJobs: seq<Async<unit -> Async<ChannelInfo>>> = GetChannelStatuses()
-    let! channelInfoInteractions: array<unit -> Async<ChannelInfo>> = Async.Parallel channelStatusJobs
-    for channelInfoInteraction in channelInfoInteractions do
-        let! channelInfo = channelInfoInteraction()
-        
-
-        
-    
-        for channelInfo in channelStatues do
-            match channelInfo.Status with
-            | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
-                let! remainingConfirmations = fundingBroadcastButNotLockedData.GetRemainingConfirmations()
-                if remainingConfirmations = 0u then
-                    Console.WriteLine(sprintf "Funding for channel %s confirmed" (ChannelId.ToString channelId))
-                    Console.WriteLine "In order to continue the funding for the channel needs to be locked"
-                    let bindAddress =
-                        if channelInfo.IsFunder then
-                            Console.WriteLine
-                                "Ensure the fundee is ready to accept a connection to lock the funding, \
-                                then press any key to continue."
-                            Console.ReadKey true |> ignore
-                            IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
-                        else
-                            Console.WriteLine "Listening for connection from peer"
-                            UserInteraction.AskBindAddress()
-                    let password = UserInteraction.AskPassword false
-                    use lightningNode = LightningNode.Start channelStore password bindAddress
-                    let! lockFundingRes = LightningNode.LockChannelFunding lightningNode channelId
-                    match lockFundingRes with
-                    | Error lockFundingError ->
-                        Console.WriteLine(sprintf "Error reestablishing channel: %s" lockFundingError.Message)
-                        if lockFundingError.PossibleBug then
-                            let msg =
-                                sprintf
-                                    "Error reestablishing channel %s to lock funding: %s"
-                                    (ChannelId.ToString channelId)
-                                    lockFundingError.Message
-                            Infrastructure.ReportWarningMessage msg
-                    | Ok () ->
-                        Console.WriteLine(sprintf "funding locked for channel %s" (ChannelId.ToString channelId))
-
-    }
-    let jobs = seq {
-                match channelInfo.Status with
-                | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData ->
-                | _ -> ()
-    }
-
-let CheckLightningChannelStatuses(): Async<array<ChannelInfo>> = async {
+                | ChannelStatus.Broken ->
+                    async {
+                        return async {
+                            return seq {
+                                yield! UserInteraction.DisplayLightningChannelStatus channelInfo
+                                yield "        channel is in an abnormal state"
+                            }
+                        }
+                    }
 
 }
 
@@ -587,8 +555,8 @@ let rec RetryOptionFunctionUntilSome (functionToRetry: unit -> Option<'T>): 'T =
     | None ->
         RetryOptionFunctionUntilSome functionToRetry
 
-let rec PerformOperation (numAccounts: int): unit =
-    match UserInteraction.AskOperation numAccounts with
+let rec PerformOperation (accounts: seq<IAccount>): unit =
+    match UserInteraction.AskOperation accounts with
     | Operations.Exit -> exit 0
     | Operations.CreateAccounts ->
         let bootstrapTask = Caching.Instance.BootstrapServerStatsFromTrustedSource() |> Async.StartAsTask
@@ -665,27 +633,24 @@ let rec CheckArchivedAccountsAreEmpty(): bool =
 
 let rec ProgramMainLoop() =
     let accounts = Account.GetAllActiveAccounts()
-    let channelStatusJobs: seq<Async<unit -> Async<ChannelInfo>>> = GetChannelStatuses accounts
-    let channelInfoInteractionsJob: Async<array<unit -> Async<ChannelInfo>>> = Async.Parallel channelStatusJobs
+    let channelStatusJobs: seq<Async<Async<seq<string>>>> = GetChannelStatuses accounts
+    let channelInfoInteractionsJob: Async<array<Async<seq<string>>>> = Async.Parallel channelStatusJobs
     let displayAccountStatusesJob = 
         UserInteraction.DisplayAccountStatuses(WhichAccount.All accounts)
-    let jobs = [| channelInfoInteractionsJob; displayAccountStatusesJob |]
-    let [| channelInfoInteractions; accountStatusesLines |] =
-        jobs
-        |> Async.Parallel
+    let channelInfoInteractions, accountStatusesLines =
+        AsyncExtensions.MixedParallel2 channelInfoInteractionsJob displayAccountStatusesJob
         |> Async.RunSynchronously
 
     Console.WriteLine ()
     Console.WriteLine "*** STATUS ***"
     Console.WriteLine(String.concat Environment.NewLine accountStatusesLines)
     for channelInfoInteraction in channelInfoInteractions do
-        let channelInfo =
-            channelInfoInteraction()
-            |> Async.RunSyncronously
-        UserInteraction.DisplayLightningChannelStatus channelInfo
+        let channelStatusLines =
+            channelInfoInteraction |> Async.RunSynchronously
+        Console.WriteLine(String.concat Environment.NewLine channelStatusLines)
 
     if CheckArchivedAccountsAreEmpty() then
-        PerformOperation (accounts.Count())
+        PerformOperation accounts
 
     ProgramMainLoop()
 

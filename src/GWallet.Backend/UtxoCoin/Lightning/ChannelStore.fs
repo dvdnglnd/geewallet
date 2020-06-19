@@ -43,6 +43,7 @@ type ChannelInfo = {
     MaxBalance: decimal
     MinBalance: decimal
     Status: ChannelStatus
+    Currency: Currency
 } with
     static member internal FromSerializedChannel (serializedChannel: SerializedChannel)
                                                      : ChannelInfo = {
@@ -53,6 +54,7 @@ type ChannelInfo = {
         Capacity = serializedChannel.Capacity().ToUnit(NBitcoin.MoneyUnit.BTC)
         MaxBalance = serializedChannel.MaxBalance().BTC |> decimal
         MinBalance = serializedChannel.MinBalance().BTC |> decimal
+        Currency = Currency.BTC
         Status =
             match serializedChannel.ChanState with
             | ChannelState.Normal _ -> ChannelStatus.Active
@@ -131,4 +133,9 @@ type ChannelStore(account: NormalUtxoAccount) =
     member this.ChannelInfo (channelId: ChannelId): ChannelInfo =
         let serializedChannel = this.LoadChannel channelId
         ChannelInfo.FromSerializedChannel serializedChannel
+
+    member this.ListChannelInfos(): seq<ChannelInfo> = seq {
+        for channelId in this.ListChannelIds() do
+            yield this.ChannelInfo channelId
+    }
 

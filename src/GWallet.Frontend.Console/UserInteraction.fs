@@ -6,11 +6,10 @@ open System.Linq
 open System.Globalization
 open System.Net
 
-//open DotNetLightning.Utils
-//open DotNetLightning.Channel
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.UtxoCoin.Lightning
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 type internal Operations =
     | Exit                    = 0
@@ -23,12 +22,10 @@ type internal Operations =
     | ArchiveAccount          = 7
     | PairToWatchWallet       = 8
     | Options                 = 9
-    (*
     | OpenChannel             = 10
     | AcceptChannel           = 11
     | SendLightningPayment    = 12
     | ReceiveLightningPayment = 13
-    *)
 
 type WhichAccount =
     All of seq<IAccount> | MatchingWith of IAccount
@@ -77,8 +74,8 @@ module UserInteraction =
                 else
                     FindMatchingOperation operationIntroduced tail
 
-    let internal OperationAvailable (operation: Operations) (numAccounts: int) =
-        let noAccounts = numAccounts = 0
+    let internal OperationAvailable (operation: Operations) (accounts: seq<IAccount>) =
+        let noAccounts = Seq.isEmpty accounts
         match operation with
         | Operations.SendPayment
         | Operations.SignOffPayment
@@ -88,15 +85,19 @@ module UserInteraction =
             ->
                 not noAccounts
         | Operations.CreateAccounts -> noAccounts
-        (*
         | Operations.OpenChannel
         | Operations.AcceptChannel
             -> not noAccounts
         | Operations.SendLightningPayment ->
-            (Lightning.ListAvailableChannelIds true).Any()
+            accounts.OfType<UtxoCoin.NormalUtxoAccount>().SelectMany(fun account ->
+                let channelStore = ChannelStore account
+                channelStore.ListChannelInfos()
+            ).Any(fun channelInfo -> channelInfo.IsFunder)
         | Operations.ReceiveLightningPayment ->
-            (Lightning.ListAvailableChannelIds false).Any()
-        *)
+            accounts.OfType<UtxoCoin.NormalUtxoAccount>().SelectMany(fun account ->
+                let channelStore = ChannelStore account
+                channelStore.ListChannelInfos()
+            ).Any(fun channelInfo -> not channelInfo.IsFunder)
         | _ -> true
 
     let rec internal AskFileNameToLoad (askText: string): FileInfo =
@@ -111,7 +112,7 @@ module UserInteraction =
             Presentation.Error "File not found, try again."
             AskFileNameToLoad askText
 
-    let rec internal AskOperation (numAccounts: int): Operations =
+    let rec internal AskOperation (accounts: seq<IAccount>): Operations =
         Console.WriteLine "Available operations:"
 
         // TODO: move these 2 lines below to FSharpUtil?
@@ -120,7 +121,7 @@ module UserInteraction =
         let allOperationsAvailable =
             seq {
                 for operation in allOperations do
-                    if OperationAvailable operation numAccounts then
+                    if OperationAvailable operation accounts then
                         Console.WriteLine(sprintf "%d: %s"
                                               (int operation)
                                               (Presentation.ConvertPascalCaseToSentence (operation.ToString())))
@@ -131,7 +132,7 @@ module UserInteraction =
         try
             FindMatchingOperation operationIntroduced allOperationsAvailable
         with
-        | :? NoOperationFound -> AskOperation numAccounts
+        | :? NoOperationFound -> AskOperation accounts
 
     let rec private AskDob (repeat: bool): DateTime =
         let format = "dd/MM/yyyy"
@@ -272,16 +273,6 @@ module UserInteraction =
         | _ ->
             DisplayAccountStatusInner accountNumber account maybeBalance maybeUsdValue
 
-    (*
-    let GetLightningBalance (channelState: IHasCommitments): decimal * decimal =
-        let balance = channelState.Commitments.LocalCommit.Spec.ToLocal
-        let channelReserve = channelState.Commitments.LocalParams.ChannelReserveSatoshis
-        let spendable = LNMoney.Max(LNMoney.Zero, balance - channelReserve)
-        let balanceBtc = (decimal balance.Value) / (decimal LNMoneyUnit.BTC)
-        let spendableBtc = (decimal spendable.Value) / (decimal LNMoneyUnit.BTC)
-        balanceBtc, spendableBtc
-    *)
-
     let DisplayLightningChannelStatus (channelInfo: ChannelInfo): seq<string> = seq {
         let capacity = channelInfo.Capacity
         let currency = channelInfo.Currency
@@ -308,7 +299,7 @@ module UserInteraction =
                     currency
                     (BalanceInUsdString sendable maybeUsdValue)
         else
-            yield sprintf "    channel %s (incoming):" (serializedChannel.ChannelId.Value.ToString())
+            yield sprintf "    channel %s (incoming):" (ChannelId.ToString channelInfo.ChannelId)
             let received = channelInfo.Balance
             let receivable = channelInfo.MaxBalance
             yield
@@ -326,36 +317,6 @@ module UserInteraction =
                     receivable
                     currency
                     (BalanceInUsdString receivable maybeUsdValue)
-        match channelInfo.Status with
-        | ChannelStatus.Active ->
-            yield "        channel is active"
-        | ChannelStatus.FundingBroadcastButNotLocked fundingBroadcastButNotLockedData =
-            let remainingConfirmations =
-                fundingBroadcastButNotLockedData.GetRemainingConfirmations()
-                |> Async.RunSynchronously
-            yield sprintf "        waiting for %i more confirmations" remainingConfirmations
-        let status =
-            Lightning.GetSerializedChannelStatus serializedChannel
-            |> Async.RunSynchronously
-        match status with
-        | Lightning.ChannelStatus.Active ->
-            yield "        channel is active"
-        | Lightning.ChannelStatus.WaitingForConfirmations remainingConfirmations ->
-            yield sprintf "        waiting for %i more confirmations" remainingConfirmations.Value
-        | Lightning.ChannelStatus.FundingConfirmed ->
-            yield "        funding confirmed"
-        | Lightning.ChannelStatus.InvalidChannelState ->
-            yield "        channel is in an abnormal state"
-    }
-
-    let DisplayLightningChannelStatuses (channelStore: ChannelStore): seq<string> = seq {
-        let channelIds = channelStore.ListChannelIds()
-        yield String.Empty
-        yield sprintf "Lightning Status (%d channels)" (List.length channelIds)
-        for channelId in channelIds do
-            let channelInfo = channelStore.ChannelInfo channelId
-            yield! DisplayLightningChannelStatus channelInfo
-        yield String.Empty
     }
 
     let private GetAccountBalanceInner (account: IAccount): Async<IAccount*MaybeCached<decimal>*MaybeCached<decimal>> =
@@ -704,8 +665,8 @@ module UserInteraction =
             let fiatValueEstimation =
                 FiatValueEstimation.UsdValue Currency.BTC
                 |> Async.RunSynchronously
-            let balanceBtc = channelInfo.BalanceBtc
-            let spendableBtc = channelInfo.SpendableBalanceBtc
+            let balanceBtc = channelInfo.Balance
+            let spendableBtc = channelInfo.SpendableBalance
             Console.WriteLine(
                 sprintf
                     "full balance=[%s] (%s)"
