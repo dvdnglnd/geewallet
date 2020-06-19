@@ -7,10 +7,12 @@ open System.Net.Sockets
 open NBitcoin
 
 open DotNetLightning.Serialize.Msgs
+open DotNetLightning.Utils
 
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.FSharpUtil.UwpHacks
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 open FSharp.Core
 
 type PeerErrorMessage = {

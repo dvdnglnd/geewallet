@@ -7,6 +7,7 @@ open System.Net
 open NBitcoin
 open DotNetLightning.Channel
 open DotNetLightning.Chain
+open DotNetLightning.Utils
 open DotNetLightning.Crypto
 open DotNetLightning.Transactions
 open DotNetLightning.Serialize
@@ -15,6 +16,7 @@ open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.FSharpUtil.UwpHacks
 open GWallet.Backend.UtxoCoin.Lightning.Util
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open Newtonsoft.Json
 
@@ -105,39 +107,40 @@ type SerializedChannel = {
             "A SerializedChannel is only created once a channel has started \
             being established and must therefore have an initial commitment"
 
-    member this.Capacity(): LNMoney =
-        let spec = serializedChannel.Commitments.LocalCommit.Spec
-        spec.ToLocal + spec.ToRemote
+    member this.IsFunder: bool =
+        this.Commitments.LocalParams.IsFunder
 
-    member this.Balance(): LNMoney =
+    member this.Capacity(): Money =
+        this.Commitments.FundingScriptCoin.Amount
+
+    member this.Balance(): DotNetLightning.Utils.LNMoney =
         this.Commitments.LocalCommit.Spec.ToLocal
 
-    member this.SpendableBalance(): LNMoney =
+    member this.SpendableBalance(): DotNetLightning.Utils.LNMoney =
         this.Commitments.SpendableBalance()
 
     // How low the balance can go. A channel must maintain enough balance to
     // cover the channel reserve. The funder must also keep enough in the
     // channel to cover the closing fee.
-    member this.MinBalance(): LNMoney =
+    member this.MinBalance(): DotNetLightning.Utils.LNMoney =
         this.Balance() - this.SpendableBalance()
 
     // How high the balance can go. The fundee will only be able to receive up
     // to this amount before the funder no longer has enough funds to cover
     // the channel reserve and closing fee.
-    member this.MaxBalance(): LNMoney =
+    member this.MaxBalance(): DotNetLightning.Utils.LNMoney =
+        let capacity = LNMoney.FromMoney <| this.Capacity()
         let channelReserve =
-            LNMoney.FromMoney serializedChannel.Commitments.LocalParams.ChannelReserveSatoshis
+            LNMoney.FromMoney this.Commitments.LocalParams.ChannelReserveSatoshis
         let fee =
-            let feeRate = serializedChannel.Commitments.LocalCommit.Spec.FeeRatePerKw
-            let weight = COMMITMENT_TX_BASE_WEIGHT
-            LNMoney.FromMoney <| feeRate.ToFee weight
-        let totalReceivable = this.Capacity() - channelReserve - fee
-
-    member this.SpendableCapacity(): LnMoney =
+            if this.IsFunder then
+                let feeRate = this.Commitments.LocalCommit.Spec.FeeRatePerKw
+                let weight = COMMITMENT_TX_BASE_WEIGHT
+                LNMoney.FromMoney <| feeRate.ToFee weight
+            else
+                LNMoney.Zero
+        capacity - channelReserve - fee
 
     member this.ChannelId: ChannelId =
         ChannelId.FromDnl this.Commitments.ChannelId
-
-    member this.IsFunder: bool =
-        this.Commitments.LocalParams.IsFunder
 

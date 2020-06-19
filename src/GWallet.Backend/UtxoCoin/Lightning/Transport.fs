@@ -8,11 +8,13 @@ open System.Diagnostics
 open NBitcoin
 
 open DotNetLightning.Peer
+open DotNetLightning.Utils
 
 open GWallet.Backend
 open GWallet.Backend.FSharpUtil
 open GWallet.Backend.FSharpUtil.UwpHacks
 open GWallet.Backend.UtxoCoin.Lightning.Util
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 

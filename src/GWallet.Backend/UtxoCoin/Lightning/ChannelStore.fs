@@ -3,10 +3,12 @@ namespace GWallet.Backend.UtxoCoin.Lightning
 open System.IO
 
 open DotNetLightning.Channel
+open DotNetLightning.Utils
 
 open GWallet.Backend
 open GWallet.Backend.UtxoCoin
 open GWallet.Backend.FSharpUtil.UwpHacks
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 type FundingBroadcastButNotLockedData = {
     TxId: TxId
@@ -27,13 +29,6 @@ type FundingBroadcastButNotLockedData = {
                 return 0u
         }
 
-type ActiveData =
-    {
-        sentBtc: decimal
-
-    }
-    member
-
 type ChannelStatus =
     | FundingBroadcastButNotLocked of FundingBroadcastButNotLockedData
     | Active
@@ -53,8 +48,11 @@ type ChannelInfo = {
                                                      : ChannelInfo = {
         ChannelId = serializedChannel.ChannelId
         IsFunder = serializedChannel.IsFunder
-        BalanceBtc = serializedChannel.Balance().BTC |> decimal
-        SpendableBalanceBtc = serializedChannel.SpendableBalance().BTC |> decimal
+        Balance = serializedChannel.Balance().BTC |> decimal
+        SpendableBalance = serializedChannel.SpendableBalance().BTC |> decimal
+        Capacity = serializedChannel.Capacity().ToUnit(NBitcoin.MoneyUnit.BTC)
+        MaxBalance = serializedChannel.MaxBalance().BTC |> decimal
+        MinBalance = serializedChannel.MinBalance().BTC |> decimal
         Status =
             match serializedChannel.ChanState with
             | ChannelState.Normal _ -> ChannelStatus.Active

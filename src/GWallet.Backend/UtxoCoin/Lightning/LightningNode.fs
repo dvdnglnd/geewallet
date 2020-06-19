@@ -5,10 +5,12 @@ open System.IO
 open System.Net
 
 open NBitcoin
+open DotNetLightning.Utils
 
 open GWallet.Backend
 open GWallet.Backend.UtxoCoin
 open GWallet.Backend.FSharpUtil.UwpHacks
+open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 type NodeOpenChannelError =
     | Connect of ConnectError
