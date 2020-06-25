@@ -16,7 +16,7 @@ open FSharp.Core
 type ChannelWrapper = {
     Channel: Channel
 } with
-    static member internal Create (nodeId: NodeId)
+    static member internal Create (nodeId: NodeIdWrapper)
                          (shutdownScriptPubKey: Script)
                          (nodeSecret: ExtKey)
                          (channelIndex: int)
@@ -69,16 +69,16 @@ type ChannelWrapper = {
     }
 
     member this.RemoteNodeId
-        with get(): NodeId = NodeId.FromDnl this.Channel.RemoteNodeId
+        with get(): NodeIdWrapper = NodeIdWrapper.FromDnl this.Channel.RemoteNodeId
 
     member internal this.Network
         with get(): Network = this.Channel.Network
 
     member this.ChannelId
-        with get(): Option<ChannelId> =
+        with get(): Option<ChannelIdWrapper> =
             match this.Channel.State.ChannelId with
             | Some channelId ->
-                Some <| ChannelId.FromDnl channelId
+                Some <| ChannelIdWrapper.FromDnl channelId
             | None -> None
 
     member internal this.ChannelKeys
@@ -86,7 +86,7 @@ type ChannelWrapper = {
             this.Channel.KeysRepository.GetChannelKeys false
 
     member this.FundingTxId
-        with get(): Option<TxId> =
+        with get(): Option<TxIdWrapper> =
             match this.Channel.State.Commitments with
             | Some commitments ->
                 commitments.FundingScriptCoin.Outpoint.Hash

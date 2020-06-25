@@ -28,7 +28,7 @@ type SerializedCommitmentSpec = {
 }
 
 type SerializedCommitments = {
-    ChannelId: ChannelId
+    ChannelId: ChannelIdWrapper
     ChannelFlags: uint8
     FundingScriptCoin: ScriptCoin
     LocalChanges: LocalChanges
@@ -69,7 +69,7 @@ type private CommitmentsJsonConverter() =
 
     override this.WriteJson(writer: JsonWriter, state: Commitments, serializer: JsonSerializer) =
         serializer.Serialize(writer, {
-            ChannelId = ChannelId.FromDnl state.ChannelId
+            ChannelId = ChannelIdWrapper.FromDnl state.ChannelId
             ChannelFlags = state.ChannelFlags
             FundingScriptCoin = state.FundingScriptCoin
             LocalChanges = state.LocalChanges
@@ -88,7 +88,7 @@ type private CommitmentsJsonConverter() =
 type SerializedChannel = {
     ChannelIndex: int
     Network: Network
-    RemoteNodeId: NodeId
+    RemoteNodeId: NodeIdWrapper
     ChanState: ChannelState
     AccountFileName: string
     CounterpartyIP: IPEndPoint
@@ -141,6 +141,6 @@ type SerializedChannel = {
                 LNMoney.Zero
         capacity - channelReserve - fee
 
-    member this.ChannelId: ChannelId =
-        ChannelId.FromDnl this.Commitments.ChannelId
+    member this.ChannelId: ChannelIdWrapper =
+        ChannelIdWrapper.FromDnl this.Commitments.ChannelId
 

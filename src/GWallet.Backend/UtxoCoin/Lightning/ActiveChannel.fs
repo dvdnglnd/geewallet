@@ -279,7 +279,7 @@ and internal ActiveChannel = {
 
     static member internal ConnectReestablish (channelStore: ChannelStore)
                                      (nodeSecretKey: ExtKey)
-                                     (channelId: ChannelId)
+                                     (channelId: ChannelIdWrapper)
                                          : Async<Result<ActiveChannel, ReconnectActiveChannelError>> = async {
         let! connectRes =
             ConnectedChannel.ConnectFromWallet channelStore nodeSecretKey channelId
@@ -294,7 +294,7 @@ and internal ActiveChannel = {
 
     static member internal AcceptReestablish (channelStore: ChannelStore)
                                     (transportListener: TransportListener)
-                                    (channelId: ChannelId)
+                                    (channelId: ChannelIdWrapper)
                                         : Async<Result<ActiveChannel, ReconnectActiveChannelError >> = async {
         let! connectRes =
             ConnectedChannel.AcceptFromWallet channelStore transportListener channelId
@@ -322,7 +322,7 @@ and internal ActiveChannel = {
                 and so guarantees that the underlying channel state has a balance"
 
     member this.ChannelId
-        with get(): ChannelId = this.ConnectedChannel.ChannelId
+        with get(): ChannelIdWrapper = this.ConnectedChannel.ChannelId
 
     member private this.SendCommit(): Async<Result<ActiveChannel, SendCommitError>> = async {
         let connectedChannel = this.ConnectedChannel

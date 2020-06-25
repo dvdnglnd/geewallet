@@ -63,7 +63,7 @@ type IChannelToBeOpened =
 
 type PendingChannel internal (outgoingUnfundedChannel: OutgoingUnfundedChannel) =
     member internal this.OutgoingUnfundedChannel = outgoingUnfundedChannel
-    member public this.Accept (): Async<Result<TxId, IErrorMsg>> = async {
+    member public this.Accept (): Async<Result<TxIdWrapper, IErrorMsg>> = async {
         let! fundedChannelRes =
             FundedChannel.FundChannel this.OutgoingUnfundedChannel
         match fundedChannelRes with
@@ -151,7 +151,7 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                 return Ok <| PendingChannel(outgoingUnfundedChannel)
     }
 
-    member internal this.AcceptChannel (): Async<Result<TxId, IErrorMsg>> = async {
+    member internal this.AcceptChannel (): Async<Result<TxIdWrapper, IErrorMsg>> = async {
         let! acceptPeerRes =
             PeerWrapper.AcceptAnyFromTransportListener this.TransportListener
         match acceptPeerRes with
@@ -181,7 +181,7 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                 return Ok txId
     }
 
-    member internal this.SendMonoHopPayment (channelId: ChannelId)
+    member internal this.SendMonoHopPayment (channelId: ChannelIdWrapper)
                                             (transferAmount: TransferAmount)
                                                 : Async<Result<unit, IErrorMsg>> = async {
         let amount =
@@ -216,7 +216,7 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                 return Ok ()
     }
 
-    member internal this.ReceiveMonoHopPayment (channelId: ChannelId)
+    member internal this.ReceiveMonoHopPayment (channelId: ChannelIdWrapper)
                                           : Async<Result<unit, IErrorMsg>> = async {
         let! activeChannelRes = ActiveChannel.AcceptReestablish this.ChannelStore this.TransportListener channelId
         match activeChannelRes with
@@ -246,7 +246,7 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                 return Ok ()
     }
 
-    member internal this.LockChannelFunding (channelId: ChannelId)
+    member internal this.LockChannelFunding (channelId: ChannelIdWrapper)
                                                 : Async<Result<unit, IErrorMsg>> =
         async {
             let channelInfo = this.ChannelStore.ChannelInfo channelId

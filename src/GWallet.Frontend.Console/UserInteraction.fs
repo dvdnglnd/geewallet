@@ -836,7 +836,7 @@ module UserInteraction =
 
     let rec AskChannelId (channelStore: ChannelStore)
                          (isFunder: bool)
-                             : Option<ChannelId> =
+                             : Option<ChannelIdWrapper> =
         let channelIds = seq {
             for channelId in channelStore.ListChannelIds() do
                 let channelInfo = channelStore.ChannelInfo channelId
@@ -845,7 +845,7 @@ module UserInteraction =
         }
 
         Console.WriteLine "Available channels:"
-        let rec listChannels (index: int) (channelIds: seq<ChannelId>) =
+        let rec listChannels (index: int) (channelIds: seq<ChannelIdWrapper>) =
             if not <| Seq.isEmpty channelIds then
                 let channelId = Seq.head channelIds
                 Console.WriteLine(sprintf "%d: %s" index (ChannelId.ToString channelId))

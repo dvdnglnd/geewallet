@@ -104,7 +104,7 @@ type internal MsgStream = {
     }
 
     static member internal Connect (nodeSecret: ExtKey)
-                          (peerNodeId: NodeId)
+                          (peerNodeId: NodeIdWrapper)
                           (peerId: PeerId)
                               : Async<Result<Init * MsgStream, ConnectError>> = async {
         let! transportStreamRes =
@@ -135,7 +135,7 @@ type internal MsgStream = {
     }
 
     member this.RemoteNodeId
-        with get(): NodeId = this.TransportStream.RemoteNodeId
+        with get(): NodeIdWrapper = this.TransportStream.RemoteNodeId
 
     member internal this.PeerId
         with get(): PeerId = this.TransportStream.PeerId

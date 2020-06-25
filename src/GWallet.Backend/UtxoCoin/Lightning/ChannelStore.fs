@@ -11,7 +11,7 @@ open GWallet.Backend.FSharpUtil.UwpHacks
 open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 type FundingBroadcastButNotLockedData = {
-    TxId: TxId
+    TxId: TxIdWrapper
     MinimumDepth: uint32
 } with
     member this.GetRemainingConfirmations(): Async<uint32> =
@@ -35,7 +35,7 @@ type ChannelStatus =
     | Broken
 
 type ChannelInfo = {
-    ChannelId: ChannelId
+    ChannelId: ChannelIdWrapper
     IsFunder: bool
     Balance: decimal
     SpendableBalance: decimal
@@ -59,7 +59,7 @@ type ChannelInfo = {
             match serializedChannel.ChanState with
             | ChannelState.Normal _ -> ChannelStatus.Active
             | ChannelState.WaitForFundingConfirmed waitForFundingConfirmedData ->
-                let txId = TxId.FromHash waitForFundingConfirmedData.Commitments.FundingScriptCoin.Outpoint.Hash
+                let txId = TxIdWrapper.FromHash waitForFundingConfirmedData.Commitments.FundingScriptCoin.Outpoint.Hash
                 let minimumDepth = serializedChannel.MinSafeDepth.Value
                 let fundingBroadcastButNotLockedData = {
                     TxId = txId
@@ -85,8 +85,8 @@ type ChannelStore(account: NormalUtxoAccount) =
         let subdirectory = SPrintF1 "%s-lightning" (this.Account :> IAccount).PublicAddress
         Path.Combine (this.AccountDir.FullName, subdirectory) |> DirectoryInfo
 
-    member this.ListChannelIds(): seq<ChannelId> =
-        let extractChannelId path: Option<ChannelId> =
+    member this.ListChannelIds(): seq<ChannelIdWrapper> =
+        let extractChannelId path: Option<ChannelIdWrapper> =
             let fileName = Path.GetFileName path
             let withoutPrefix = fileName.Substring ChannelStore.ChannelFilePrefix.Length
             let withoutEnding =
@@ -94,7 +94,7 @@ type ChannelStore(account: NormalUtxoAccount) =
                     0,
                     withoutPrefix.Length - ChannelStore.ChannelFileEnding.Length
                 )
-            ChannelId.Parse withoutEnding
+            ChannelIdWrapper.Parse withoutEnding
 
         if this.ChannelDir.Exists then
             let files =
@@ -103,7 +103,7 @@ type ChannelStore(account: NormalUtxoAccount) =
         else
             Seq.empty
 
-    member this.ChannelFileName (channelId: ChannelId): string =
+    member this.ChannelFileName (channelId: ChannelIdWrapper): string =
         Path.Combine(
             this.ChannelDir.FullName,
             SPrintF3
@@ -113,7 +113,7 @@ type ChannelStore(account: NormalUtxoAccount) =
                 ChannelStore.ChannelFileEnding
         )
 
-    member internal this.LoadChannel (channelId: ChannelId): SerializedChannel =
+    member internal this.LoadChannel (channelId: ChannelIdWrapper): SerializedChannel =
         let fileName = this.ChannelFileName channelId
         let json = File.ReadAllText fileName
         Marshalling.DeserializeCustom<SerializedChannel> (
@@ -132,7 +132,7 @@ type ChannelStore(account: NormalUtxoAccount) =
             this.ChannelDir.Create()
         File.WriteAllText(fileName, json)
 
-    member this.ChannelInfo (channelId: ChannelId): ChannelInfo =
+    member this.ChannelInfo (channelId: ChannelIdWrapper): ChannelInfo =
         let serializedChannel = this.LoadChannel channelId
         ChannelInfo.FromSerializedChannel serializedChannel
 

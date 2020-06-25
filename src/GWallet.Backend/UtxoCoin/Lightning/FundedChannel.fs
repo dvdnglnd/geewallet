@@ -299,12 +299,12 @@ type internal FundedChannel = {
     }
 
     member this.FundingTxId
-        with get(): TxId = this.ConnectedChannel.FundingTxId
+        with get(): TxIdWrapper = this.ConnectedChannel.FundingTxId
 
     member internal this.MinimumDepth
         with get(): BlockHeightOffset32 = this.ConnectedChannel.MinimumDepth
 
     member this.ChannelId
-        with get(): ChannelId = this.ConnectedChannel.ChannelId
+        with get(): ChannelIdWrapper = this.ConnectedChannel.ChannelId
 
 

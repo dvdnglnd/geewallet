@@ -93,7 +93,7 @@ type internal OutgoingUnfundedChannel = {
             let funding = Money(channelCapacity.ValueToSend, MoneyUnit.BTC)
             let defaultFinalScriptPubKey = Account.CreatePayoutScript account
             channelWrapper.LocalParams funding defaultFinalScriptPubKey true
-        let temporaryChannelId = ChannelId.NewRandom()
+        let temporaryChannelId = ChannelIdWrapper.NewRandom()
         let feeRate =
             channelWrapper.Channel.FeeEstimator.GetEstSatPer1000Weight ConfirmationTarget.Normal
         let openChannelMsgRes, channelWrapperAfterOpenChannel =
@@ -150,5 +150,5 @@ type internal OutgoingUnfundedChannel = {
         with get(): BlockHeightOffset32 = this.ConnectedChannel.MinimumDepth
 
     member this.ChannelId
-        with get(): ChannelId = this.ConnectedChannel.ChannelId
+        with get(): ChannelIdWrapper = this.ConnectedChannel.ChannelId
 

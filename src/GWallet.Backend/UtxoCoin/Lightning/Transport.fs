@@ -105,8 +105,8 @@ type internal TransportListener =
     member this.IPEndPoint: IPEndPoint =
         this.Listener.LocalEndpoint :?> IPEndPoint
 
-    member this.NodeId: NodeId =
-        NodeId.FromPubKey this.PubKey
+    member this.NodeId: NodeIdWrapper =
+        NodeIdWrapper.FromPubKey this.PubKey
 
     member this.LnEndPoint: LnEndPoint =
         LnEndPoint.FromParts this.NodeId this.IPEndPoint
@@ -151,7 +151,7 @@ type internal TransportStream =
         read buf 0
 
     static member internal Connect (nodeSecret: ExtKey)
-                          (peerNodeId: NodeId)
+                          (peerNodeId: NodeIdWrapper)
                           (peerId: PeerId)
                               : Async<Result<TransportStream, HandshakeError>> = async {
         let nodeSecretKey = nodeSecret.PrivateKey
@@ -248,9 +248,9 @@ type internal TransportStream =
     }
 
     member this.RemoteNodeId
-        with get(): NodeId =
+        with get(): NodeIdWrapper =
             match this.Peer.TheirNodeId with
-            | Some nodeId -> NodeId.FromDnl nodeId
+            | Some nodeId -> NodeIdWrapper.FromDnl nodeId
             | None -> 
                 failwith
                     "The TransportStream type is created by performing a handshake \

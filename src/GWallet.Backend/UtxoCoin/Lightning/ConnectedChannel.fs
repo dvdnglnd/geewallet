@@ -70,7 +70,7 @@ type internal ConnectedChannel = {
 
     static member private LoadChannel (channelStore: ChannelStore)
                                       (nodeSecretKey: ExtKey)
-                                      (channelId: ChannelId)
+                                      (channelId: ChannelIdWrapper)
                                           : Async<SerializedChannel * ChannelWrapper> = async {
         let serializedChannel = channelStore.LoadChannel channelId
         Infrastructure.LogDebug <| SPrintF1 "loading channel for %s" (channelId.ToString())
@@ -152,7 +152,7 @@ type internal ConnectedChannel = {
 
     static member internal ConnectFromWallet (channelStore: ChannelStore)
                                     (nodeSecretKey: ExtKey)
-                                    (channelId: ChannelId)
+                                    (channelId: ChannelIdWrapper)
                                         : Async<Result<ConnectedChannel, ReconnectError>> = async {
         let! serializedChannel, channelWrapper =
             ConnectedChannel.LoadChannel channelStore nodeSecretKey channelId
@@ -185,7 +185,7 @@ type internal ConnectedChannel = {
 
     static member internal AcceptFromWallet (channelStore: ChannelStore)
                                    (transportListener: TransportListener)
-                                   (channelId: ChannelId)
+                                   (channelId: ChannelIdWrapper)
                                        : Async<Result<ConnectedChannel, ReconnectError>> = async {
         let! serializedChannel, channelWrapper =
             ConnectedChannel.LoadChannel channelStore transportListener.NodeSecret channelId
@@ -228,20 +228,20 @@ type internal ConnectedChannel = {
         channelStore.SaveChannel serializedChannel
 
     member this.RemoteNodeId
-        with get(): NodeId = this.ChannelWrapper.RemoteNodeId
+        with get(): NodeIdWrapper = this.ChannelWrapper.RemoteNodeId
 
     member internal this.Network
         with get(): Network = this.ChannelWrapper.Network
 
     member this.ChannelId
-        with get(): ChannelId =
+        with get(): ChannelIdWrapper =
             UnwrapOption
                 this.ChannelWrapper.ChannelId
                 "A ConnectedChannel guarantees that a channel is connected and \
                 therefore has a channel id"
 
     member this.FundingTxId
-        with get(): TxId =
+        with get(): TxIdWrapper =
             UnwrapOption
                 this.ChannelWrapper.FundingTxId
                 "A ConnectedChannel guarantees that a channel has been \

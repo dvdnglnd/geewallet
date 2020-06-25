@@ -62,7 +62,7 @@ and internal PeerWrapper = {
             (this.MsgStream :> IDisposable).Dispose()
 
     static member internal Connect (nodeSecret: ExtKey)
-                          (peerNodeId: NodeId)
+                          (peerNodeId: NodeIdWrapper)
                           (peerId: PeerId)
                               : Async<Result<PeerWrapper, ConnectError>> = async {
         let! connectRes = MsgStream.Connect nodeSecret peerNodeId peerId
@@ -76,7 +76,7 @@ and internal PeerWrapper = {
     }
 
     static member internal AcceptFromTransportListener (transportListener: TransportListener)
-                                              (peerNodeId: NodeId)
+                                              (peerNodeId: NodeIdWrapper)
                                                   : Async<Result<PeerWrapper, ConnectError>> = async {
         let! acceptRes = MsgStream.AcceptFromTransportListener transportListener
         match acceptRes with
@@ -104,7 +104,7 @@ and internal PeerWrapper = {
             }
     }
 
-    member this.RemoteNodeId: NodeId =
+    member this.RemoteNodeId: NodeIdWrapper =
         this.MsgStream.RemoteNodeId
 
     member internal this.PeerId: PeerId =

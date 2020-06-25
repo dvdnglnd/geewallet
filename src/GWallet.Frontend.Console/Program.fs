@@ -69,7 +69,7 @@ let OpenChannel(): Async<unit> = async {
                             | Error fundChannelError ->
                                 Console.WriteLine(sprintf "Error funding channel: %s" fundChannelError.Message)
                             | Ok txId ->
-                                let txId: TxId = txId
+                                let txId: TxIdWrapper = txId
                                 let uri = BlockExplorer.GetTransaction Currency.BTC (TxId.ToString txId)
                                 Console.WriteLine(sprintf "A funding transaction was broadcast: %A" uri)
             UserInteraction.PressAnyKeyToContinue()

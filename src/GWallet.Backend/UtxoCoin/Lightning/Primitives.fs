@@ -14,27 +14,27 @@ type BitcoinPublicKey internal (pubKey: PubKey) =
 *)
 
 module Primitives =
-    type NodeId internal (dnlNodeId: DotNetLightning.Utils.Primitives.NodeId) =
+    type NodeIdWrapper internal (dnlNodeId: DotNetLightning.Utils.Primitives.NodeId) =
         member internal this.DnlNodeId =
             dnlNodeId
 
         static member internal FromDnl (dnlNodeId: DotNetLightning.Utils.Primitives.NodeId) =
-            NodeId dnlNodeId
+            NodeIdWrapper dnlNodeId
 
-        static member internal FromPubKey (pubKey: NBitcoin.PubKey): NodeId =
-            NodeId (DotNetLightning.Utils.Primitives.NodeId pubKey)
+        static member internal FromPubKey (pubKey: NBitcoin.PubKey): NodeIdWrapper =
+            NodeIdWrapper (DotNetLightning.Utils.Primitives.NodeId pubKey)
 
-        static member Parse (text: string): NodeId =
+        static member Parse (text: string): NodeIdWrapper =
             text
             |> NBitcoin.PubKey
             |> DotNetLightning.Utils.Primitives.NodeId
-            |> NodeId
+            |> NodeIdWrapper
 
         override this.ToString() =
             this.DnlNodeId.Value.ToString()
 
     module NodeId =
-        let Parse = NodeId.Parse
+        let Parse = NodeIdWrapper.Parse
 
     (*
     type NodeId private (pubKeyString: string) =
@@ -56,7 +56,7 @@ module Primitives =
     *)
 
     type LnEndPoint = internal {
-        NodeId: NodeId
+        NodeId: NodeIdWrapper
         IPEndPoint: IPEndPoint
     } with
         static member Parse (text: string): LnEndPoint =
@@ -72,7 +72,7 @@ module Primitives =
             let ipAddressText = ipEndPointText.[..portSeparatorIndex - 1]
             let portText = ipEndPointText.[portSeparatorIndex + 1 ..]
 
-            let nodeId = NodeId.Parse nodeIdText
+            let nodeId = NodeIdWrapper.Parse nodeIdText
             let ipAddress = IPAddress.Parse ipAddressText
             let port = UInt16.Parse portText
             {
@@ -80,7 +80,7 @@ module Primitives =
                 IPEndPoint = IPEndPoint(ipAddress, int port)
             }
 
-        static member FromParts (nodeId: NodeId) (ipEndPoint: IPEndPoint) =
+        static member FromParts (nodeId: NodeIdWrapper) (ipEndPoint: IPEndPoint) =
             {
                 NodeId = nodeId
                 IPEndPoint = ipEndPoint
@@ -89,13 +89,13 @@ module Primitives =
         override this.ToString() =
             SPrintF2 "%s@%s" (this.NodeId.ToString()) (this.IPEndPoint.ToString())
 
-    type ChannelId = internal {
+    type ChannelIdWrapper = internal {
         DnlChannelId: DotNetLightning.Utils.Primitives.ChannelId
     } with
-        static member internal FromDnl (dnlChannelId: DotNetLightning.Utils.Primitives.ChannelId): ChannelId =
+        static member internal FromDnl (dnlChannelId: DotNetLightning.Utils.Primitives.ChannelId): ChannelIdWrapper =
             { DnlChannelId = dnlChannelId }
 
-        static member NewRandom(): ChannelId =
+        static member NewRandom(): ChannelIdWrapper =
             let dnlChannelId =
                 let random = Org.BouncyCastle.Security.SecureRandom() :> Random
                 let temporaryChannelIdBytes: array<byte> = Array.zeroCreate 32
@@ -105,7 +105,7 @@ module Primitives =
                 |> DotNetLightning.Utils.Primitives.ChannelId
             { DnlChannelId = dnlChannelId }
 
-        static member Parse (text: string): Option<ChannelId> =
+        static member Parse (text: string): Option<ChannelIdWrapper> =
             try
                 let dnlChannelId =
                     text
@@ -118,26 +118,26 @@ module Primitives =
         override this.ToString() = this.DnlChannelId.Value.ToString()
 
     module ChannelId =
-        let ToString (channelId: ChannelId): string = channelId.ToString()
+        let ToString (channelId: ChannelIdWrapper): string = channelId.ToString()
 
-    type TxId = internal {
+    type TxIdWrapper = internal {
         DnlTxId: DotNetLightning.Utils.Primitives.TxId
     } with
         (*
         static member internal FromDnl (dnlTxId: DotNetLightning.Utils.Primitives.TxId)
-                                           : TxId =
+                                           : TxIdWrapper =
             { DnlTxId = dnlTxId }
         *)
 
-        static member internal FromHash (txIdHash: NBitcoin.uint256): TxId =
+        static member internal FromHash (txIdHash: NBitcoin.uint256): TxIdWrapper =
             { DnlTxId = DotNetLightning.Utils.Primitives.TxId txIdHash }
 
         override this.ToString() = this.DnlTxId.Value.ToString()
 
     module TxId =
-        let FromDnl (dnlTxId: DotNetLightning.Utils.Primitives.TxId): TxId =
+        let FromDnl (dnlTxId: DotNetLightning.Utils.Primitives.TxId): TxIdWrapper =
             { DnlTxId = dnlTxId }
-        let ToString (txId: TxId) = txId.ToString()
+        let ToString (txId: TxIdWrapper) = txId.ToString()
 
     (*
     type internal HTLCId = DotNetLightning.Utils.Primitives.HTLCId
