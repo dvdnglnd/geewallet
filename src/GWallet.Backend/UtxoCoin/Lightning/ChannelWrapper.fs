@@ -16,7 +16,7 @@ open FSharp.Core
 type ChannelWrapper = {
     Channel: Channel
 } with
-    static member Create (nodeId: NodeId)
+    static member internal Create (nodeId: NodeId)
                          (shutdownScriptPubKey: Script)
                          (nodeSecret: ExtKey)
                          (channelIndex: int)
@@ -71,7 +71,7 @@ type ChannelWrapper = {
     member this.RemoteNodeId
         with get(): NodeId = NodeId.FromDnl this.Channel.RemoteNodeId
 
-    member this.Network
+    member internal this.Network
         with get(): Network = this.Channel.Network
 
     member this.ChannelId
@@ -81,7 +81,7 @@ type ChannelWrapper = {
                 Some <| ChannelId.FromDnl channelId
             | None -> None
 
-    member this.ChannelKeys
+    member internal this.ChannelKeys
         with get(): ChannelKeys =
             this.Channel.KeysRepository.GetChannelKeys false
 
@@ -95,13 +95,13 @@ type ChannelWrapper = {
                 |> Some
             | None -> None
 
-    member this.FundingScriptCoin
+    member internal this.FundingScriptCoin
         with get(): Option<ScriptCoin> =
             match this.Channel.State.Commitments with
             | Some commitments -> Some commitments.FundingScriptCoin
             | None -> None
 
-    member this.LocalParams (funding: Money)
+    member internal this.LocalParams (funding: Money)
                             (defaultFinalScriptPubKey: Script)
                             (isFunder: bool)
                                 : LocalParams = {
@@ -118,7 +118,7 @@ type ChannelWrapper = {
         Features = MsgStream.SupportedFeatures
     }
 
-    member this.ExecuteCommand<'T> (channelCmd: ChannelCommand)
+    member internal this.ExecuteCommand<'T> (channelCmd: ChannelCommand)
                                    (eventFilter: List<ChannelEvent> -> Option<'T>)
                                        : Result<'T, ChannelError> * ChannelWrapper =
         let channel = this.Channel
@@ -142,12 +142,12 @@ type ChannelWrapper = {
                     channelCmd
                     evtList
 
-    member this.Balance(): Option<LNMoney> =
+    member internal this.Balance(): Option<LNMoney> =
         match this.Channel.State.Commitments with
         | Some commitments -> Some commitments.LocalCommit.Spec.ToLocal
         | None -> None
 
-    member this.SpendableBalance(): Option<LNMoney> =
+    member internal this.SpendableBalance(): Option<LNMoney> =
         match this.Channel.State.Commitments with
         | Some commitments -> Some <| commitments.SpendableBalance()
         | None -> None

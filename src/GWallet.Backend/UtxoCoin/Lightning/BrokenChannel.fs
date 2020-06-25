@@ -1,5 +1,5 @@
 namespace GWallet.Backend.UtxoCoin.Lightning
 
-type BrokenChannel = {
+type internal BrokenChannel = {
     ConnectedChannel: ConnectedChannel
 }

@@ -20,7 +20,7 @@ open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 
-type OpenChannelError =
+type internal OpenChannelError =
     | InvalidChannelParameters of PeerWrapper * ChannelError
     | RecvAcceptChannel of RecvMsgError
     | OpenChannelPeerErrorResponse of PeerWrapper * PeerErrorMessage
@@ -31,19 +31,19 @@ type OpenChannelError =
         | InvalidChannelParameters (_, err) ->
             SPrintF1 "Invalid channel parameters: %s" err.Message
         | RecvAcceptChannel err ->
-            SPrintF1 "Error receiving accept_channel: %s" err.Message
+            SPrintF1 "Error receiving accept_channel: %s" (err :> IErrorMsg).Message
         | OpenChannelPeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our open_channel with an error message: %s" err.Message
+            SPrintF1 "Peer responded to our open_channel with an error message: %s" (err :> IErrorMsg).Message
         | ExpectedAcceptChannel msg ->
             SPrintF1 "Expected accept_channel, got %A" (msg.GetType())
-    member this.PossibleBug =
+    member internal this.PossibleBug =
         match this with
         | RecvAcceptChannel err -> err.PossibleBug
         | InvalidChannelParameters _
         | OpenChannelPeerErrorResponse _
         | ExpectedAcceptChannel _ -> false
 
-type OutgoingUnfundedChannel = {
+type internal OutgoingUnfundedChannel = {
     ConnectedChannel: ConnectedChannel
     AcceptChannel: AcceptChannel
 } with
@@ -146,7 +146,7 @@ type OutgoingUnfundedChannel = {
                 | _ -> return Error <| ExpectedAcceptChannel channelMsg
     }
 
-    member this.MinimumDepth
+    member internal this.MinimumDepth
         with get(): BlockHeightOffset32 = this.ConnectedChannel.MinimumDepth
 
     member this.ChannelId

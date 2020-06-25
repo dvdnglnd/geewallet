@@ -15,43 +15,45 @@ open GWallet.Backend.FSharpUtil.UwpHacks
 open GWallet.Backend.UtxoCoin.Lightning.Primitives
 open FSharp.Core
 
-type PeerErrorMessage = {
-    ErrorMessage: ErrorMessage
-} with
-    member this.Message =
-        if this.ErrorMessage.Data.Length = 1 then
-            let code = this.ErrorMessage.Data.[0]
-            (SPrintF1 "Error code %i received from lightning peer: " code) +
-            match code with
-            | 0x01uy ->
-                "The number of pending channels exceeds the policy limit.\n\
-                Hint: You can try from a new node identity."
-            | 0x02uy ->
-                "Node is not synced to blockchain." +
-                if Config.BitcoinNet = Network.RegTest then
-                    "\nHint: Try mining some blocks before opening."
-                else
-                    String.Empty
-            | 0x03uy ->
-                "Channel capacity too large.\n\
-                Hint: Try with a smaller funding amount."
-            | _ ->
-                "(unknown error code)"
-        else
-            System.Text.ASCIIEncoding.ASCII.GetString this.ErrorMessage.Data
+type PeerErrorMessage =
+    {
+        ErrorMessage: ErrorMessage
+    }
+    interface IErrorMsg with
+        member this.Message =
+            if this.ErrorMessage.Data.Length = 1 then
+                let code = this.ErrorMessage.Data.[0]
+                (SPrintF1 "Error code %i received from lightning peer: " code) +
+                match code with
+                | 0x01uy ->
+                    "The number of pending channels exceeds the policy limit.\n\
+                    Hint: You can try from a new node identity."
+                | 0x02uy ->
+                    "Node is not synced to blockchain." +
+                    if Config.BitcoinNet = Network.RegTest then
+                        "\nHint: Try mining some blocks before opening."
+                    else
+                        String.Empty
+                | 0x03uy ->
+                    "Channel capacity too large.\n\
+                    Hint: Try with a smaller funding amount."
+                | _ ->
+                    "(unknown error code)"
+            else
+                System.Text.ASCIIEncoding.ASCII.GetString this.ErrorMessage.Data
 
-type RecvChannelMsgError =
+type internal RecvChannelMsgError =
     | RecvMsg of RecvMsgError
     | ReceivedPeerErrorMessage of PeerWrapper * PeerErrorMessage
-    with
-    member this.Message =
-        match this with
-        | RecvMsg err ->
-            SPrintF1 "Error receiving message from peer: %s" err.Message
-        | ReceivedPeerErrorMessage (_, err) ->
-            SPrintF1 "Error message from peer: %s" err.Message
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvMsg err ->
+                SPrintF1 "Error receiving message from peer: %s" (err :> IErrorMsg).Message
+            | ReceivedPeerErrorMessage (_, err) ->
+                SPrintF1 "Error message from peer: %s" (err :> IErrorMsg).Message
 
-and PeerWrapper = {
+and internal PeerWrapper = {
     Init: Init
     MsgStream: MsgStream
 } with
@@ -59,7 +61,7 @@ and PeerWrapper = {
         member this.Dispose() =
             (this.MsgStream :> IDisposable).Dispose()
 
-    static member Connect (nodeSecret: ExtKey)
+    static member internal Connect (nodeSecret: ExtKey)
                           (peerNodeId: NodeId)
                           (peerId: PeerId)
                               : Async<Result<PeerWrapper, ConnectError>> = async {
@@ -73,7 +75,7 @@ and PeerWrapper = {
             }
     }
 
-    static member AcceptFromTransportListener (transportListener: TransportListener)
+    static member internal AcceptFromTransportListener (transportListener: TransportListener)
                                               (peerNodeId: NodeId)
                                                   : Async<Result<PeerWrapper, ConnectError>> = async {
         let! acceptRes = MsgStream.AcceptFromTransportListener transportListener
@@ -90,7 +92,7 @@ and PeerWrapper = {
                 return! PeerWrapper.AcceptFromTransportListener transportListener peerNodeId
     }
 
-    static member AcceptAnyFromTransportListener (transportListener: TransportListener)
+    static member internal AcceptAnyFromTransportListener (transportListener: TransportListener)
                                                      : Async<Result<PeerWrapper, ConnectError>> = async {
         let! acceptRes = MsgStream.AcceptFromTransportListener transportListener
         match acceptRes with
@@ -105,7 +107,7 @@ and PeerWrapper = {
     member this.RemoteNodeId: NodeId =
         this.MsgStream.RemoteNodeId
 
-    member this.PeerId: PeerId =
+    member internal this.PeerId: PeerId =
         this.MsgStream.PeerId
 
     member this.RemoteEndPoint: IPEndPoint =
@@ -114,15 +116,15 @@ and PeerWrapper = {
     member this.LnEndPoint: LnEndPoint =
         this.MsgStream.LnEndPoint
 
-    member this.NodeSecret: ExtKey =
+    member internal this.NodeSecret: ExtKey =
         this.MsgStream.NodeSecret
 
-    member this.SendMsg (msg: ILightningMsg): Async<PeerWrapper> = async {
+    member internal this.SendMsg (msg: ILightningMsg): Async<PeerWrapper> = async {
         let! msgStream = this.MsgStream.SendMsg msg
         return { this with MsgStream = msgStream }
     }
 
-    member this.RecvChannelMsg(): Async<Result<PeerWrapper * IChannelMsg, RecvChannelMsgError>> =
+    member internal this.RecvChannelMsg(): Async<Result<PeerWrapper * IChannelMsg, RecvChannelMsgError>> =
         let rec recv (msgStream: MsgStream) = async {
             let! recvMsgRes = msgStream.RecvMsg()
             match recvMsgRes with

@@ -55,7 +55,7 @@ let OpenChannel(): Async<unit> = async {
                     | Error nodeOpenChannelError ->
                         Console.WriteLine (sprintf "Error opening channel: %s" nodeOpenChannelError.Message)
                     | Ok pendingChannel ->
-                        let minimumDepth = pendingChannel.MinimumDepth
+                        let minimumDepth = (pendingChannel :> IChannelToBeOpened).ConfirmationsRequired
                         Console.WriteLine(
                             sprintf
                                 "Opening a channel with this party will require %i confirmations (~%i minutes)"

@@ -19,26 +19,26 @@ open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 
-type FundChannelError =
+type internal FundChannelError =
     | InvalidAcceptChannel of PeerWrapper * ChannelError
     | RecvFundingSigned of RecvMsgError
     | FundingCreatedPeerErrorResponse of PeerWrapper * PeerErrorMessage
     | InvalidFundingSigned of PeerWrapper * ChannelError
     | ExpectedFundingSigned of ILightningMsg
-    with
-    member this.Message =
-        match this with
-        | InvalidAcceptChannel (_, err) ->
-            SPrintF1 "Invalid accept_channel message: %s" err.Message
-        | RecvFundingSigned err ->
-            SPrintF1 "Error receiving funding_signed message: %s" err.Message
-        | FundingCreatedPeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our funding_created message with an error: %s" err.Message
-        | InvalidFundingSigned (_, err) ->
-            SPrintF1 "Invalid funding_signed message: %s" err.Message
-        | ExpectedFundingSigned msg ->
-            SPrintF1 "Expected funding_signed msg, got %A" (msg.GetType())
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | InvalidAcceptChannel (_, err) ->
+                SPrintF1 "Invalid accept_channel message: %s" err.Message
+            | RecvFundingSigned err ->
+                SPrintF1 "Error receiving funding_signed message: %s" (err :> IErrorMsg).Message
+            | FundingCreatedPeerErrorResponse (_, err) ->
+                SPrintF1 "Peer responded to our funding_created message with an error: %s" (err :> IErrorMsg).Message
+            | InvalidFundingSigned (_, err) ->
+                SPrintF1 "Invalid funding_signed message: %s" err.Message
+            | ExpectedFundingSigned msg ->
+                SPrintF1 "Expected funding_signed msg, got %A" (msg.GetType())
+    member internal this.PossibleBug =
         match this with
         | RecvFundingSigned err -> err.PossibleBug
         | InvalidAcceptChannel _
@@ -46,7 +46,7 @@ type FundChannelError =
         | InvalidFundingSigned _
         | ExpectedFundingSigned _ -> false
 
-type AcceptChannelError =
+type internal AcceptChannelError =
     | RecvOpenChannel of RecvMsgError
     | PeerErrorMessageInsteadOfOpenChannel of PeerWrapper * PeerErrorMessage
     | InvalidOpenChannel of PeerWrapper * ChannelError
@@ -55,26 +55,26 @@ type AcceptChannelError =
     | AcceptChannelPeerErrorResponse of PeerWrapper * PeerErrorMessage
     | InvalidFundingCreated of PeerWrapper * ChannelError
     | ExpectedFundingCreated of ILightningMsg
-    with
-    member this.Message =
-        match this with
-        | RecvOpenChannel err ->
-            SPrintF1 "Error receiving open_channel msg: %s" err.Message
-        | PeerErrorMessageInsteadOfOpenChannel (_, err) ->
-            SPrintF1 "Peer sent an error message instead of open_channel: %s" err.Message
-        | InvalidOpenChannel (_, err) ->
-            SPrintF1 "Invalid open_channel message: %s" err.Message
-        | ExpectedOpenChannel msg ->
-            SPrintF1 "Expected open_channel msg, got %A" (msg.GetType())
-        | RecvFundingCreated err ->
-            SPrintF1 "Error receiving funding_created message: %s" err.Message
-        | AcceptChannelPeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our accept_channel message with an error: %s" err.Message
-        | InvalidFundingCreated (_, err) ->
-            SPrintF1 "Invalid funding_created message: %s" err.Message
-        | ExpectedFundingCreated msg ->
-            SPrintF1 "Expected funding_created message, got %A" (msg.GetType())
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvOpenChannel err ->
+                SPrintF1 "Error receiving open_channel msg: %s" (err :> IErrorMsg).Message
+            | PeerErrorMessageInsteadOfOpenChannel (_, err) ->
+                SPrintF1 "Peer sent an error message instead of open_channel: %s" (err :> IErrorMsg).Message
+            | InvalidOpenChannel (_, err) ->
+                SPrintF1 "Invalid open_channel message: %s" err.Message
+            | ExpectedOpenChannel msg ->
+                SPrintF1 "Expected open_channel msg, got %A" (msg.GetType())
+            | RecvFundingCreated err ->
+                SPrintF1 "Error receiving funding_created message: %s" (err :> IErrorMsg).Message
+            | AcceptChannelPeerErrorResponse (_, err) ->
+                SPrintF1 "Peer responded to our accept_channel message with an error: %s" (err :> IErrorMsg).Message
+            | InvalidFundingCreated (_, err) ->
+                SPrintF1 "Invalid funding_created message: %s" err.Message
+            | ExpectedFundingCreated msg ->
+                SPrintF1 "Expected funding_created message, got %A" (msg.GetType())
+    member internal this.PossibleBug =
         match this with
         | RecvOpenChannel err -> err.PossibleBug
         | RecvFundingCreated err -> err.PossibleBug
@@ -84,8 +84,8 @@ type AcceptChannelError =
         | AcceptChannelPeerErrorResponse _
         | InvalidFundingCreated _
         | ExpectedFundingCreated _ -> false
-    
-type FundedChannel = {
+
+type internal FundedChannel = {
     ConnectedChannel: ConnectedChannel
     TheirFundingLockedMsgOpt: Option<FundingLocked>
 } with
@@ -156,7 +156,7 @@ type FundedChannel = {
                 | _ -> return Error <| ExpectedFundingSigned channelMsg
     }
 
-    static member AcceptChannel (peerWrapper: PeerWrapper)
+    static member internal AcceptChannel (peerWrapper: PeerWrapper)
                                 (account: NormalUtxoAccount)
                                     : Async<Result<FundedChannel, AcceptChannelError>> = async {
         let nodeSecret = peerWrapper.NodeSecret
@@ -267,21 +267,21 @@ type FundedChannel = {
 
     }
 
-    member this.FundingScriptCoin
+    member internal this.FundingScriptCoin
         with get(): ScriptCoin =
             UnwrapOption
                 this.ConnectedChannel.FundingScriptCoin
                 "The FundedChannel type is created by funding a channel and \
                 guarantees that the underlying ChannelState has a script coin"
 
-    member this.GetConfirmations(): Async<BlockHeightOffset32> = async {
+    member internal this.GetConfirmations(): Async<BlockHeightOffset32> = async {
         let! confirmationCount =
             let txId = this.FundingTxId.ToString()
             QueryBTCFast (ElectrumClient.GetConfirmations txId)
         return confirmationCount |> BlockHeightOffset32
     }
 
-    member this.GetLocationOnChain(): Async<BlockHeight * TxIndexInBlock> = async {
+    member internal this.GetLocationOnChain(): Async<BlockHeight * TxIndexInBlock> = async {
         let fundingScriptCoin = this.FundingScriptCoin
         let txIdHex: string = this.ConnectedChannel.FundingTxId.ToString()
         let fundingDestination: TxDestination = fundingScriptCoin.ScriptPubKey.GetDestination()
@@ -301,7 +301,7 @@ type FundedChannel = {
     member this.FundingTxId
         with get(): TxId = this.ConnectedChannel.FundingTxId
 
-    member this.MinimumDepth
+    member internal this.MinimumDepth
         with get(): BlockHeightOffset32 = this.ConnectedChannel.MinimumDepth
 
     member this.ChannelId

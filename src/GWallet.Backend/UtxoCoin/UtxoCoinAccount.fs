@@ -20,7 +20,7 @@ type internal TransactionOutpoint =
     member self.ToCoin (): Coin =
         Coin(self.Transaction, uint32 self.OutputIndex)
 
-type IUtxoAccount =
+type internal IUtxoAccount =
     inherit IAccount
 
     abstract member PublicKey: PubKey with get
@@ -341,7 +341,7 @@ module Account =
             return raise <| InsufficientBalanceForFee None
     }
 
-    let EstimateFeeP2WSH (account: IUtxoAccount)
+    let EstimateFeeP2WSH (account: NormalUtxoAccount)
                          (amount: TransferAmount)
                              : Async<TransactionMetadata> =
         // use a dummy, all-zero witness script to estimate the fee
@@ -351,8 +351,8 @@ module Account =
 
         EstimateFeeForDestination account amount dummyAddr
 
-    let EstimateFee (account: IUtxoAccount) (amount: TransferAmount) (destination: string)
-                        : Async<TransactionMetadata> =
+    let internal EstimateFee (account: IUtxoAccount) (amount: TransferAmount) (destination: string)
+                                 : Async<TransactionMetadata> =
         EstimateFeeForDestination
             account
             amount
@@ -546,6 +546,6 @@ module Account =
         | :? FormatException ->
             raise (AddressWithInvalidChecksum None)
 
-    let CreatePayoutScript (account: IUtxoAccount) =
-        let scriptAddress = BitcoinScriptAddress (account.PublicAddress, Config.BitcoinNet)
+    let CreatePayoutScript (account: NormalUtxoAccount) =
+        let scriptAddress = BitcoinScriptAddress ((account:>IAccount).PublicAddress, Config.BitcoinNet)
         scriptAddress.ScriptPubKey

@@ -19,45 +19,45 @@ open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 
-type ReestablishError =
+type internal ReestablishError =
     | RecvReestablish of RecvMsgError
     | PeerErrorResponse of PeerWrapper * PeerErrorMessage
     | ExpectedReestablishMsg of ILightningMsg
     | ExpectedReestablishOrFundingLockedMsg of ILightningMsg
-    with
-    member this.Message =
-        match this with
-        | RecvReestablish err ->
-            SPrintF1 "Error receiving channel_reestablish: %s" err.Message
-        | PeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our channel_reestablish with an error: %s" err.Message
-        | ExpectedReestablishMsg msg ->
-            SPrintF1 "Expected channel_reestablish, got %A" (msg.GetType())
-        | ExpectedReestablishOrFundingLockedMsg msg ->
-            SPrintF1 "Expected channel_reestablish or funding_locked, got %A" (msg.GetType())
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvReestablish err ->
+                SPrintF1 "Error receiving channel_reestablish: %s" (err :> IErrorMsg).Message
+            | PeerErrorResponse (_, err) ->
+                SPrintF1 "Peer responded to our channel_reestablish with an error: %s" (err :> IErrorMsg).Message
+            | ExpectedReestablishMsg msg ->
+                SPrintF1 "Expected channel_reestablish, got %A" (msg.GetType())
+            | ExpectedReestablishOrFundingLockedMsg msg ->
+                SPrintF1 "Expected channel_reestablish or funding_locked, got %A" (msg.GetType())
+    member internal this.PossibleBug =
         match this with
         | RecvReestablish err -> err.PossibleBug
         | PeerErrorResponse _
         | ExpectedReestablishMsg _
         | ExpectedReestablishOrFundingLockedMsg _ -> false
 
-type ReconnectError =
+type internal ReconnectError =
     | Connect of ConnectError
     | Reestablish of ReestablishError
-    with
-    member this.Message =
-        match this with
-        | Connect err ->
-            SPrintF1 "Error reconnecting to peer: %s" err.Message
-        | Reestablish err ->
-            SPrintF1 "Error reestablishing channel with connected peer: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | Connect err ->
+                SPrintF1 "Error reconnecting to peer: %s" (err :> IErrorMsg).Message
+            | Reestablish err ->
+                SPrintF1 "Error reestablishing channel with connected peer: %s" (err :> IErrorMsg).Message
+    member internal this.PossibleBug =
         match this with
         | Connect err -> err.PossibleBug
         | Reestablish err -> err.PossibleBug
 
-type ConnectedChannel = {
+type internal ConnectedChannel = {
     PeerWrapper: PeerWrapper
     ChannelWrapper: ChannelWrapper
     Account: NormalUtxoAccount
@@ -150,7 +150,7 @@ type ConnectedChannel = {
             return Ok (peerWrapperAfterReestablishReceived, channelWrapperAfterReestablishSent)
     }
 
-    static member ConnectFromWallet (channelStore: ChannelStore)
+    static member internal ConnectFromWallet (channelStore: ChannelStore)
                                     (nodeSecretKey: ExtKey)
                                     (channelId: ChannelId)
                                         : Async<Result<ConnectedChannel, ReconnectError>> = async {
@@ -183,7 +183,7 @@ type ConnectedChannel = {
                 return Ok connectedChannel
     }
 
-    static member AcceptFromWallet (channelStore: ChannelStore)
+    static member internal AcceptFromWallet (channelStore: ChannelStore)
                                    (transportListener: TransportListener)
                                    (channelId: ChannelId)
                                        : Async<Result<ConnectedChannel, ReconnectError>> = async {
@@ -230,7 +230,7 @@ type ConnectedChannel = {
     member this.RemoteNodeId
         with get(): NodeId = this.ChannelWrapper.RemoteNodeId
 
-    member this.Network
+    member internal this.Network
         with get(): Network = this.ChannelWrapper.Network
 
     member this.ChannelId
@@ -247,7 +247,7 @@ type ConnectedChannel = {
                 "A ConnectedChannel guarantees that a channel has been \
                 established and therefore has a funding txid"
 
-    member this.FundingScriptCoin
+    member internal this.FundingScriptCoin
         with get(): Option<ScriptCoin> = this.ChannelWrapper.FundingScriptCoin
 
     member this.SendError (err: string): Async<ConnectedChannel> = async {

@@ -101,7 +101,7 @@ type SerializedChannel = {
         settings.Converters.Add commitmentsConverter
         settings
 
-    member this.Commitments: Commitments =
+    member internal this.Commitments: Commitments =
         UnwrapOption
             this.ChanState.Commitments
             "A SerializedChannel is only created once a channel has started \
@@ -110,25 +110,25 @@ type SerializedChannel = {
     member this.IsFunder: bool =
         this.Commitments.LocalParams.IsFunder
 
-    member this.Capacity(): Money =
+    member internal this.Capacity(): Money =
         this.Commitments.FundingScriptCoin.Amount
 
-    member this.Balance(): DotNetLightning.Utils.LNMoney =
+    member internal this.Balance(): DotNetLightning.Utils.LNMoney =
         this.Commitments.LocalCommit.Spec.ToLocal
 
-    member this.SpendableBalance(): DotNetLightning.Utils.LNMoney =
+    member internal this.SpendableBalance(): DotNetLightning.Utils.LNMoney =
         this.Commitments.SpendableBalance()
 
     // How low the balance can go. A channel must maintain enough balance to
     // cover the channel reserve. The funder must also keep enough in the
     // channel to cover the closing fee.
-    member this.MinBalance(): DotNetLightning.Utils.LNMoney =
+    member internal this.MinBalance(): DotNetLightning.Utils.LNMoney =
         this.Balance() - this.SpendableBalance()
 
     // How high the balance can go. The fundee will only be able to receive up
     // to this amount before the funder no longer has enough funds to cover
     // the channel reserve and closing fee.
-    member this.MaxBalance(): DotNetLightning.Utils.LNMoney =
+    member internal this.MaxBalance(): DotNetLightning.Utils.LNMoney =
         let capacity = LNMoney.FromMoney <| this.Capacity()
         let channelReserve =
             LNMoney.FromMoney this.Commitments.LocalParams.ChannelReserveSatoshis

@@ -17,7 +17,7 @@ open GWallet.Backend.UtxoCoin.Lightning.Util
 
 open Newtonsoft.Json
 
-type FeatureBitJsonConverter() =
+type internal FeatureBitJsonConverter() =
     inherit JsonConverter<FeatureBit>()
 
     override this.ReadJson(reader: JsonReader, _: Type, _: FeatureBit, _: bool, serializer: JsonSerializer) =
@@ -27,7 +27,7 @@ type FeatureBitJsonConverter() =
     override this.WriteJson(writer: JsonWriter, state: FeatureBit, serializer: JsonSerializer) =
         serializer.Serialize(writer, state.ToString())
 
-type IPAddressJsonConverter() =
+type internal IPAddressJsonConverter() =
     inherit JsonConverter<IPAddress>()
 
     override this.ReadJson(reader: JsonReader, _: Type, _: IPAddress, _: bool, serializer: JsonSerializer) =
@@ -37,7 +37,7 @@ type IPAddressJsonConverter() =
     override this.WriteJson(writer: JsonWriter, state: IPAddress, serializer: JsonSerializer) =
         serializer.Serialize(writer, state.ToString())
 
-type IPEndPointJsonConverter() =
+type internal IPEndPointJsonConverter() =
     inherit JsonConverter<IPEndPoint>()
 
     override this.ReadJson(reader: JsonReader, _: Type, _: IPEndPoint, _: bool, serializer: JsonSerializer) =
@@ -56,8 +56,8 @@ type IPEndPointJsonConverter() =
         serializer.Serialize(writer, state.Port)
         writer.WriteEndArray()
 
-module JsonMarshalling =
-    let SerializerSettings: JsonSerializerSettings =
+module internal JsonMarshalling =
+    let internal SerializerSettings: JsonSerializerSettings =
         let settings = Marshalling.DefaultSettings ()
         let ipAddressConverter = IPAddressJsonConverter()
         let ipEndPointConverter = IPEndPointJsonConverter()

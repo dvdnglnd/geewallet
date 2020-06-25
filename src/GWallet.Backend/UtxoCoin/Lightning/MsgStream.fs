@@ -20,16 +20,16 @@ type InitializeError =
     | ReceiveInit of RecvBytesError
     | DeserializeInit of P2PDecodeError
     | UnexpectedMsg of ILightningMsg
-    with
-    member this.Message =
-        match this with
-        | ReceiveInit err ->
-            SPrintF1 "Error receiving init message: %s" err.Message
-        | DeserializeInit err ->
-            SPrintF1 "Error deserializing init message: %s" err.Message
-        | UnexpectedMsg msg ->
-            SPrintF1 "Expected init message, got %A" (msg.GetType())
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | ReceiveInit err ->
+                SPrintF1 "Error receiving init message: %s" (err :> IErrorMsg).Message
+            | DeserializeInit err ->
+                SPrintF1 "Error deserializing init message: %s" err.Message
+            | UnexpectedMsg msg ->
+                SPrintF1 "Expected init message, got %A" (msg.GetType())
+    member internal this.PossibleBug =
         match this with
         | ReceiveInit err -> err.PossibleBug
         | DeserializeInit _
@@ -38,14 +38,14 @@ type InitializeError =
 type ConnectError =
     | Handshake of HandshakeError
     | Initialize of InitializeError
-    with
-    member this.Message =
-        match this with
-        | Handshake err ->
-            SPrintF1 "Handshake failed: %s" err.Message
-        | Initialize err ->
-            SPrintF1 "Message stream initialization failed: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | Handshake err ->
+                SPrintF1 "Handshake failed: %s" (err :> IErrorMsg).Message
+            | Initialize err ->
+                SPrintF1 "Message stream initialization failed: %s" (err :> IErrorMsg).Message
+    member internal this.PossibleBug =
         match this with
         | Handshake err -> err.PossibleBug
         | Initialize err -> err.PossibleBug
@@ -53,26 +53,26 @@ type ConnectError =
 type RecvMsgError =
     | RecvBytes of RecvBytesError
     | DeserializeMsg of P2PDecodeError
-    with
-    member this.Message =
-        match this with
-        | RecvBytes err ->
-            SPrintF1 "Error receiving raw data from peer: %s" err.Message
-        | DeserializeMsg err ->
-            SPrintF1 "Error deserializing message from peer: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvBytes err ->
+                SPrintF1 "Error receiving raw data from peer: %s" (err :> IErrorMsg).Message
+            | DeserializeMsg err ->
+                SPrintF1 "Error deserializing message from peer: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | RecvBytes err -> err.PossibleBug
         | DeserializeMsg _ -> false
 
-type MsgStream = {
+type internal MsgStream = {
     TransportStream: TransportStream
 } with
     interface IDisposable with
         member this.Dispose() =
             (this.TransportStream :> IDisposable).Dispose()
 
-    static member SupportedFeatures: FeatureBit = 
+    static member internal SupportedFeatures: FeatureBit =
         let featureBits = FeatureBit.Zero
         featureBits.SetFeature Feature.OptionDataLossProtect FeaturesSupport.Optional true
         featureBits
@@ -103,7 +103,7 @@ type MsgStream = {
                 | _ -> return Error <| UnexpectedMsg msg
     }
 
-    static member Connect (nodeSecret: ExtKey)
+    static member internal Connect (nodeSecret: ExtKey)
                           (peerNodeId: NodeId)
                           (peerId: PeerId)
                               : Async<Result<Init * MsgStream, ConnectError>> = async {
@@ -121,7 +121,7 @@ type MsgStream = {
             | Ok (init, msgStream) -> return Ok (init, msgStream)
     }
 
-    static member AcceptFromTransportListener (transportListener: TransportListener)
+    static member internal AcceptFromTransportListener (transportListener: TransportListener)
                                                   : Async<Result<Init * MsgStream, ConnectError>> = async {
         let! transportStreamRes =
             TransportStream.AcceptFromTransportListener transportListener
@@ -137,7 +137,7 @@ type MsgStream = {
     member this.RemoteNodeId
         with get(): NodeId = this.TransportStream.RemoteNodeId
 
-    member this.PeerId
+    member internal this.PeerId
         with get(): PeerId = this.TransportStream.PeerId
 
     member this.RemoteEndPoint
@@ -146,16 +146,16 @@ type MsgStream = {
     member this.LnEndPoint: LnEndPoint =
         this.TransportStream.LnEndPoint
 
-    member this.NodeSecret
-        with get(): ExtKey = this.TransportStream.NodeSecret
+    member internal this.NodeSecret =
+        this.TransportStream.NodeSecret
 
-    member this.SendMsg (msg: ILightningMsg): Async<MsgStream> = async {
+    member internal this.SendMsg (msg: ILightningMsg): Async<MsgStream> = async {
         let bytes = msg.ToBytes()
         let! transportStream = this.TransportStream.SendBytes bytes
         return { this with TransportStream = transportStream }
     }
 
-    member this.RecvMsg(): Async<Result<MsgStream * ILightningMsg, RecvMsgError>> = async {
+    member internal this.RecvMsg(): Async<Result<MsgStream * ILightningMsg, RecvMsgError>> = async {
         let! recvBytesRes = this.TransportStream.RecvBytes()
         match recvBytesRes with
         | Error recvBytesError -> return Error <| RecvBytes recvBytesError

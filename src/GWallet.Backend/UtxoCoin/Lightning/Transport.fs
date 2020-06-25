@@ -18,15 +18,17 @@ open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 
-type PeerDisconnectedError = {
-    Abruptly: bool
-} with
-    member this.Message =
-        if this.Abruptly then
-            "peer disconnected after sending a partial message"
-        else
-            "peer disconnected"
-    member this.PossibleBug =
+type PeerDisconnectedError =
+    {
+        Abruptly: bool
+    }
+    interface IErrorMsg with
+        member this.Message =
+            if this.Abruptly then
+                "peer disconnected after sending a partial message"
+            else
+                "peer disconnected"
+    member internal this.PossibleBug =
         not this.Abruptly
 
 type HandshakeError =
@@ -37,25 +39,25 @@ type HandshakeError =
     | InvalidAct2 of PeerError
     | DisconnectedOnAct3 of PeerDisconnectedError
     | InvalidAct3 of PeerError
-    with
-    member this.Message =
-        match this with
-        | TcpConnect errs ->
-            let messages = Seq.map (fun (err: SocketException) -> err.Message) errs
-            SPrintF1 "TCP connection failed: %s" (String.concat "; " messages)
-        | DisconnectedOnAct1 err ->
-            SPrintF1 "Peer disconnected before starting handshake: %s" err.Message
-        | InvalidAct1 err ->
-            SPrintF1 "Invalid handshake act 1: %s" err.Message
-        | DisconnectedOnAct2 err ->
-            SPrintF1 "Peer disconnected before sending handshake act 2: %s" err.Message
-        | InvalidAct2 err ->
-            SPrintF1 "Invalid handshake act 2: %s" err.Message
-        | DisconnectedOnAct3 err ->
-            SPrintF1 "Peer disconnected before sending handshake act 3: %s" err.Message
-        | InvalidAct3 err ->
-            SPrintF1 "Invalid handshake act 3: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | TcpConnect errs ->
+                let messages = Seq.map (fun (err: SocketException) -> err.Message) errs
+                SPrintF1 "TCP connection failed: %s" (String.concat "; " messages)
+            | DisconnectedOnAct1 err ->
+                SPrintF1 "Peer disconnected before starting handshake: %s" (err :> IErrorMsg).Message
+            | InvalidAct1 err ->
+                SPrintF1 "Invalid handshake act 1: %s" err.Message
+            | DisconnectedOnAct2 err ->
+                SPrintF1 "Peer disconnected before sending handshake act 2: %s" (err :> IErrorMsg).Message
+            | InvalidAct2 err ->
+                SPrintF1 "Invalid handshake act 2: %s" err.Message
+            | DisconnectedOnAct3 err ->
+                SPrintF1 "Peer disconnected before sending handshake act 3: %s" (err :> IErrorMsg).Message
+            | InvalidAct3 err ->
+                SPrintF1 "Invalid handshake act 3: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | DisconnectedOnAct1 _
         | DisconnectedOnAct2 _
@@ -68,27 +70,28 @@ type HandshakeError =
 type RecvBytesError =
     | PeerDisconnected of PeerDisconnectedError
     | Decryption of PeerError
-    with
-    member this.Message =
-        match this with
-        | PeerDisconnected err ->
-            SPrintF1 "Peer disconnected: %s" err.Message
-        | Decryption err ->
-            SPrintF1 "Error decrypting message from peer: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | PeerDisconnected err ->
+                SPrintF1 "Peer disconnected: %s" (err :> IErrorMsg).Message
+            | Decryption err ->
+                SPrintF1 "Error decrypting message from peer: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | PeerDisconnected err -> err.PossibleBug
         | Decryption _ -> false
 
-type TransportListener = {
-    NodeSecret: ExtKey
-    Listener: TcpListener
-} with
+type internal TransportListener =
+    internal {
+        NodeSecret: ExtKey
+        Listener: TcpListener
+    } with
     interface IDisposable with
         member this.Dispose() =
             this.Listener.Stop()
 
-    static member Bind (nodeSecret: ExtKey) (endpoint: IPEndPoint) =
+    static member internal Bind (nodeSecret: ExtKey) (endpoint: IPEndPoint) =
         let listener = new TcpListener (endpoint)
         listener.Start()
         {
@@ -96,7 +99,7 @@ type TransportListener = {
             Listener = listener
         }
 
-    member this.PubKey: PubKey =
+    member internal this.PubKey: PubKey =
         this.NodeSecret.PrivateKey.PubKey
 
     member this.IPEndPoint: IPEndPoint =
@@ -108,11 +111,12 @@ type TransportListener = {
     member this.LnEndPoint: LnEndPoint =
         LnEndPoint.FromParts this.NodeId this.IPEndPoint
 
-type TransportStream = {
-    NodeSecret: ExtKey
-    Peer: Peer
-    Client: TcpClient
-} with
+type internal TransportStream =
+    internal {
+        NodeSecret: ExtKey
+        Peer: Peer
+        Client: TcpClient
+    } with
     interface IDisposable with
         member this.Dispose() =
             this.Client.Close()
@@ -146,7 +150,7 @@ type TransportStream = {
         }
         read buf 0
 
-    static member Connect (nodeSecret: ExtKey)
+    static member internal Connect (nodeSecret: ExtKey)
                           (peerNodeId: NodeId)
                           (peerId: PeerId)
                               : Async<Result<TransportStream, HandshakeError>> = async {
@@ -201,7 +205,7 @@ type TransportStream = {
                         "DNL returned unexpected events when processing act2: %A" evts
     }
 
-    static member AcceptFromTransportListener (transportListener: TransportListener)
+    static member internal AcceptFromTransportListener (transportListener: TransportListener)
                                                   : Async<Result<TransportStream, HandshakeError>> = async {
         let! client = transportListener.Listener.AcceptTcpClientAsync() |> Async.AwaitTask
         let nodeSecretKey = transportListener.NodeSecret.PrivateKey
@@ -252,7 +256,7 @@ type TransportStream = {
                     "The TransportStream type is created by performing a handshake \
                     and in doing so guarantees that the peer's node id is known"
 
-    member this.PeerId
+    member internal this.PeerId
         with get(): PeerId = this.Peer.PeerId
 
     member this.RemoteEndPoint

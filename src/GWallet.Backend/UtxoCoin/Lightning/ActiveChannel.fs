@@ -19,7 +19,7 @@ open GWallet.Backend.UtxoCoin.Lightning.Primitives
 
 open FSharp.Core
 
-type LockFundingError =
+type internal LockFundingError =
     | RecvFundingLocked of RecvMsgError
     | FundingLockedPeerErrorResponse of BrokenChannel * PeerErrorMessage
     | ExpectedFundingLocked of ILightningMsg
@@ -28,123 +28,123 @@ type LockFundingError =
     member this.Message =
         match this with
         | RecvFundingLocked err ->
-            SPrintF1 "Error receiving funding locked: %s" err.Message
+            SPrintF1 "Error receiving funding locked: %s" (err :> IErrorMsg).Message
         | FundingLockedPeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our funding_locked with an error: %s" err.Message
+            SPrintF1 "Peer responded to our funding_locked with an error: %s" (err :> IErrorMsg).Message
         | ExpectedFundingLocked msg ->
             SPrintF1 "Expected funding_locked message, got %A" (msg.GetType())
         | InvalidFundingLocked (_, err) ->
             SPrintF1 "Invalid funding_locked message: %s" err.Message
-    member this.PossibleBug =
+    member internal this.PossibleBug =
         match this with
         | RecvFundingLocked err -> err.PossibleBug
         | FundingLockedPeerErrorResponse _
         | ExpectedFundingLocked _
         | InvalidFundingLocked _ -> false
 
-type ReconnectActiveChannelError =
+type internal ReconnectActiveChannelError =
     | Reconnect of ReconnectError
     | LockFunding of LockFundingError
-    with
-    member this.Message =
-        match this with
-        | Reconnect err ->
-            SPrintF1 "Error reconnecting: %s" err.Message
-        | LockFunding err ->
-            SPrintF1 "Error locking funding: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | Reconnect err ->
+                SPrintF1 "Error reconnecting: %s" (err :> IErrorMsg).Message
+            | LockFunding err ->
+                SPrintF1 "Error locking funding: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | Reconnect err -> err.PossibleBug
         | LockFunding err -> err.PossibleBug
 
-type SendCommitError =
+type internal SendCommitError =
     | RecvRevokeAndAck of RecvMsgError
     | CommitmentSignedPeerErrorResponse of BrokenChannel * PeerErrorMessage
     | ExpectedRevokeAndAck of ILightningMsg
     | InvalidRevokeAndAck of BrokenChannel * ChannelError
-    with
-    member this.Message =
-        match this with
-        | RecvRevokeAndAck err ->
-            SPrintF1 "Error receiving revoke_and_ack: %s" err.Message
-        | CommitmentSignedPeerErrorResponse (_, err) ->
-            SPrintF1 "Peer responded to our commitment_signed with an error message: %s" err.Message
-        | ExpectedRevokeAndAck msg ->
-            SPrintF1 "Expected revoke_and_ack, got %A" (msg.GetType())
-        | InvalidRevokeAndAck (_, err) ->
-            SPrintF1 "Invalid revoke_and_ack: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvRevokeAndAck err ->
+                SPrintF1 "Error receiving revoke_and_ack: %s" (err :> IErrorMsg).Message
+            | CommitmentSignedPeerErrorResponse (_, err) ->
+                SPrintF1 "Peer responded to our commitment_signed with an error message: %s" (err :> IErrorMsg).Message
+            | ExpectedRevokeAndAck msg ->
+                SPrintF1 "Expected revoke_and_ack, got %A" (msg.GetType())
+            | InvalidRevokeAndAck (_, err) ->
+                SPrintF1 "Invalid revoke_and_ack: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | RecvRevokeAndAck err -> err.PossibleBug
         | CommitmentSignedPeerErrorResponse _
         | ExpectedRevokeAndAck _
         | InvalidRevokeAndAck _ -> false
 
-type RecvCommitError =
+type internal RecvCommitError =
     | RecvCommitmentSigned of RecvMsgError
     | PeerErrorMessageInsteadOfCommitmentSigned of BrokenChannel * PeerErrorMessage
     | ExpectedCommitmentSigned of ILightningMsg
     | InvalidCommitmentSigned of BrokenChannel * ChannelError
-    with
-    member this.Message =
-        match this with
-        | RecvCommitmentSigned err ->
-            SPrintF1 "Error receiving commitment_signed: %s" err.Message
-        | PeerErrorMessageInsteadOfCommitmentSigned (_, err) ->
-            SPrintF1 "Peer sent us an error message instead of commitment_signed: %s" err.Message
-        | ExpectedCommitmentSigned msg ->
-            SPrintF1 "Expected commitment_signed, got %A" (msg.GetType())
-        | InvalidCommitmentSigned (_, err) ->
-            SPrintF1 "Invalid commitment signed: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvCommitmentSigned err ->
+                SPrintF1 "Error receiving commitment_signed: %s" (err :> IErrorMsg).Message
+            | PeerErrorMessageInsteadOfCommitmentSigned (_, err) ->
+                SPrintF1 "Peer sent us an error message instead of commitment_signed: %s" (err :> IErrorMsg).Message
+            | ExpectedCommitmentSigned msg ->
+                SPrintF1 "Expected commitment_signed, got %A" (msg.GetType())
+            | InvalidCommitmentSigned (_, err) ->
+                SPrintF1 "Invalid commitment signed: %s" err.Message
+    member internal this.PossibleBug =
         match this with
         | RecvCommitmentSigned err -> err.PossibleBug
         | PeerErrorMessageInsteadOfCommitmentSigned _
         | ExpectedCommitmentSigned _
         | InvalidCommitmentSigned _ -> false
 
-type SendMonoHopPaymentError =
+type internal SendMonoHopPaymentError =
     | InvalidMonoHopPayment of ActiveChannel * InvalidMonoHopUnidirectionalPaymentError
     | SendCommit of SendCommitError
     | RecvCommit of RecvCommitError
-    with
-    member this.Message =
-        match this with
-        | InvalidMonoHopPayment (_, err) ->
-            SPrintF1 "Invalid monohop payment: %s" err.Message
-        | SendCommit err ->
-            SPrintF1 "Error sending commitment: %s" err.Message
-        | RecvCommit err ->
-            SPrintF1 "Error receiving commitment: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | InvalidMonoHopPayment (_, err) ->
+                SPrintF1 "Invalid monohop payment: %s" err.Message
+            | SendCommit err ->
+                SPrintF1 "Error sending commitment: %s" (err :> IErrorMsg).Message
+            | RecvCommit err ->
+                SPrintF1 "Error receiving commitment: %s" (err :> IErrorMsg).Message
+    member internal this.PossibleBug =
         match this with
         | InvalidMonoHopPayment _ -> false
         | SendCommit err -> err.PossibleBug
         | RecvCommit err -> err.PossibleBug
 
-and RecvMonoHopPaymentError =
+and internal RecvMonoHopPaymentError =
     | RecvMonoHopPayment of RecvMsgError
     | PeerErrorMessageInsteadOfMonoHopPayment of BrokenChannel * PeerErrorMessage
     | InvalidMonoHopPayment of BrokenChannel * ChannelError
     | ExpectedMonoHopPayment of ILightningMsg
     | RecvCommit of RecvCommitError
     | SendCommit of SendCommitError
-    with
-    member this.Message =
-        match this with
-        | RecvMonoHopPayment err ->
-            SPrintF1 "Error receiving monohop payment message: %s" err.Message
-        | PeerErrorMessageInsteadOfMonoHopPayment (_, err) ->
-            SPrintF1 "Peer sent us an error message instead of a monohop payment: %s" err.Message
-        | InvalidMonoHopPayment (_, err) ->
-            SPrintF1 "Invalid monohop payment message: %s" err.Message
-        | ExpectedMonoHopPayment msg ->
-            SPrintF1 "Expected monohop payment msg, got %A" (msg.GetType())
-        | RecvCommit err ->
-            SPrintF1 "Error receiving commitment: %s" err.Message
-        | SendCommit err ->
-            SPrintF1 "Error sending commitment: %s" err.Message
-    member this.PossibleBug =
+    interface IErrorMsg with
+        member this.Message =
+            match this with
+            | RecvMonoHopPayment err ->
+                SPrintF1 "Error receiving monohop payment message: %s" (err :> IErrorMsg).Message
+            | PeerErrorMessageInsteadOfMonoHopPayment (_, err) ->
+                SPrintF1 "Peer sent us an error message instead of a monohop payment: %s" (err :> IErrorMsg).Message
+            | InvalidMonoHopPayment (_, err) ->
+                SPrintF1 "Invalid monohop payment message: %s" err.Message
+            | ExpectedMonoHopPayment msg ->
+                SPrintF1 "Expected monohop payment msg, got %A" (msg.GetType())
+            | RecvCommit err ->
+                SPrintF1 "Error receiving commitment: %s" (err :> IErrorMsg).Message
+            | SendCommit err ->
+                SPrintF1 "Error sending commitment: %s" (err :> IErrorMsg).Message
+    member internal this.PossibleBug =
         match this with
         | RecvMonoHopPayment err -> err.PossibleBug
         | RecvCommit err -> err.PossibleBug
@@ -153,7 +153,7 @@ and RecvMonoHopPaymentError =
         | InvalidMonoHopPayment _
         | ExpectedMonoHopPayment _ -> false
 
-and ActiveChannel = {
+and internal ActiveChannel = {
     ConnectedChannel: ConnectedChannel
 } with
     interface IDisposable with
@@ -277,7 +277,7 @@ and ActiveChannel = {
             return failwith <| SPrintF1 "unexpected channel state: %A" channelWrapper.Channel.State
     }
 
-    static member ConnectReestablish (channelStore: ChannelStore)
+    static member internal ConnectReestablish (channelStore: ChannelStore)
                                      (nodeSecretKey: ExtKey)
                                      (channelId: ChannelId)
                                          : Async<Result<ActiveChannel, ReconnectActiveChannelError>> = async {
@@ -292,7 +292,7 @@ and ActiveChannel = {
             | Ok activeChannel -> return Ok activeChannel
     }
 
-    static member AcceptReestablish (channelStore: ChannelStore)
+    static member internal AcceptReestablish (channelStore: ChannelStore)
                                     (transportListener: TransportListener)
                                     (channelId: ChannelId)
                                         : Async<Result<ActiveChannel, ReconnectActiveChannelError >> = async {
@@ -307,14 +307,14 @@ and ActiveChannel = {
             | Ok activeChannel -> return Ok activeChannel
     }
 
-    member this.Balance
+    member internal this.Balance
         with get(): LNMoney =
             UnwrapOption
                 (this.ConnectedChannel.ChannelWrapper.Balance())
                 "The ActiveChannel type is created by establishing a channel \
                 and so guarantees that the underlying channel state has a balance"
 
-    member this.SpendableBalance
+    member internal this.SpendableBalance
         with get(): LNMoney =
             UnwrapOption
                 (this.ConnectedChannel.ChannelWrapper.SpendableBalance())
@@ -426,7 +426,7 @@ and ActiveChannel = {
             | _ -> return Error <| ExpectedCommitmentSigned channelMsg
     }
 
-    member this.SendMonoHopUnidirectionalPayment (amount: LNMoney)
+    member internal this.SendMonoHopUnidirectionalPayment (amount: LNMoney)
                                                      : Async<Result<ActiveChannel, SendMonoHopPaymentError>> = async {
         let connectedChannel = this.ConnectedChannel
         let peerWrapper = connectedChannel.PeerWrapper

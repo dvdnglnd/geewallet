@@ -69,6 +69,8 @@ type ChannelInfo = {
             | _ -> ChannelStatus.Broken
     }
 
+
+
 type ChannelStore(account: NormalUtxoAccount) =
     static member ChannelFilePrefix = "chan-"
     static member ChannelFileEnding = ".json"
@@ -111,7 +113,7 @@ type ChannelStore(account: NormalUtxoAccount) =
                 ChannelStore.ChannelFileEnding
         )
 
-    member this.LoadChannel (channelId: ChannelId): SerializedChannel =
+    member internal this.LoadChannel (channelId: ChannelId): SerializedChannel =
         let fileName = this.ChannelFileName channelId
         let json = File.ReadAllText fileName
         Marshalling.DeserializeCustom<SerializedChannel> (
@@ -119,7 +121,7 @@ type ChannelStore(account: NormalUtxoAccount) =
             SerializedChannel.LightningSerializerSettings
         )
 
-    member this.SaveChannel (serializedChannel: SerializedChannel) = 
+    member internal this.SaveChannel (serializedChannel: SerializedChannel) =
         let fileName = this.ChannelFileName serializedChannel.ChannelId
         let json =
             Marshalling.SerializeCustom(

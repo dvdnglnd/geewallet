@@ -3,9 +3,13 @@ namespace GWallet.Backend.UtxoCoin.Lightning
 open GWallet.Backend
 open GWallet.Backend.UtxoCoin
 open GWallet.Backend.FSharpUtil.UwpHacks
+
 open FSharp.Core
 
-module Util = 
+type IErrorMsg =
+    abstract member Message: string
+
+module Util =
     let Unwrap<'T, 'TError>(result: FSharp.Core.Result<'T, 'TError>)
                            (msg: string)
                                : 'T =
