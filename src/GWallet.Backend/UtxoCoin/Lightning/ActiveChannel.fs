@@ -202,7 +202,7 @@ and internal ActiveChannel = {
                         (brokenChannel, errorMessage)
                 | Ok (peerWrapperAfterFundingLockedReceived, channelMsg) ->
                     match channelMsg with
-                    | :? FundingLocked as fundingLockedMsg ->
+                    | :? FundingLockedMsg as fundingLockedMsg ->
                         return Ok (peerWrapperAfterFundingLockedReceived, fundingLockedMsg)
                     | _ -> return Error <| ExpectedFundingLocked channelMsg
         }
@@ -352,7 +352,7 @@ and internal ActiveChannel = {
                 (brokenChannel, errorMessage)
         | Ok (peerWrapperAfterRevokeAndAckReceived, channelMsg) ->
             match channelMsg with
-            | :? RevokeAndACK as theirRevokeAndAckMsg -> 
+            | :? RevokeAndACKMsg as theirRevokeAndAckMsg ->
                 let res, channelWrapperAferRevokeAndAck =
                     let channelCmd = ChannelCommand.ApplyRevokeAndACK theirRevokeAndAckMsg
                     channelWrapperAfterCommitmentSigned.ExecuteCommand channelCmd <| function
@@ -395,7 +395,7 @@ and internal ActiveChannel = {
                 (brokenChannel, errorMessage)
         | Ok (peerWrapperAfterCommitmentSignedReceived, channelMsg) ->
             match channelMsg with
-            | :? CommitmentSigned as theirCommitmentSignedMsg ->
+            | :? CommitmentSignedMsg as theirCommitmentSignedMsg ->
                 let ourRevokeAndAckMsgRes, channelWrapperAfterCommitmentSigned =
                     let channelCmd = ChannelCommand.ApplyCommitmentSigned theirCommitmentSignedMsg
                     channelWrapper.ExecuteCommand channelCmd <| function

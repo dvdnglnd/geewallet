@@ -17,12 +17,12 @@ open FSharp.Core
 
 type PeerErrorMessage =
     {
-        ErrorMessage: ErrorMessage
+        ErrorMsg: ErrorMsg
     }
     interface IErrorMsg with
         member this.Message =
-            if this.ErrorMessage.Data.Length = 1 then
-                let code = this.ErrorMessage.Data.[0]
+            if this.ErrorMsg.Data.Length = 1 then
+                let code = this.ErrorMsg.Data.[0]
                 (SPrintF1 "Error code %i received from lightning peer: " code) +
                 match code with
                 | 0x01uy ->
@@ -40,7 +40,7 @@ type PeerErrorMessage =
                 | _ ->
                     "(unknown error code)"
             else
-                System.Text.ASCIIEncoding.ASCII.GetString this.ErrorMessage.Data
+                System.Text.ASCIIEncoding.ASCII.GetString this.ErrorMsg.Data
 
 type internal RecvChannelMsgError =
     | RecvMsg of RecvMsgError
@@ -54,7 +54,7 @@ type internal RecvChannelMsgError =
                 SPrintF1 "Error message from peer: %s" (err :> IErrorMsg).Message
 
 and internal PeerWrapper = {
-    Init: Init
+    InitMsg: InitMsg
     MsgStream: MsgStream
 } with
     interface IDisposable with
@@ -68,9 +68,9 @@ and internal PeerWrapper = {
         let! connectRes = MsgStream.Connect nodeSecret peerNodeId peerId
         match connectRes with
         | Error connectError -> return Error connectError
-        | Ok (init, msgStream) ->
+        | Ok (initMsg, msgStream) ->
             return Ok {
-                Init = init
+                InitMsg = initMsg
                 MsgStream = msgStream
             }
     }
@@ -81,10 +81,10 @@ and internal PeerWrapper = {
         let! acceptRes = MsgStream.AcceptFromTransportListener transportListener
         match acceptRes with
         | Error connectError -> return Error connectError
-        | Ok (init, msgStream) ->
+        | Ok (initMsg, msgStream) ->
             if msgStream.RemoteNodeId = peerNodeId then
                 return Ok {
-                    Init = init
+                    InitMsg = initMsg
                     MsgStream = msgStream
                 }
             else
@@ -97,9 +97,9 @@ and internal PeerWrapper = {
         let! acceptRes = MsgStream.AcceptFromTransportListener transportListener
         match acceptRes with
         | Error connectError -> return Error connectError
-        | Ok (init, msgStream) ->
+        | Ok (initMsg, msgStream) ->
             return Ok {
-                Init = init
+                InitMsg = initMsg
                 MsgStream = msgStream
             }
     }
@@ -131,15 +131,15 @@ and internal PeerWrapper = {
             | Error recvMsgError -> return Error <| RecvMsg recvMsgError
             | Ok (msgStreamAfterMsgReceived, msg) ->
                 match msg with
-                | :? ErrorMessage as errorMessage ->
+                | :? ErrorMsg as errorMsg ->
                     let peerWrapper = { this with MsgStream = msgStreamAfterMsgReceived }
-                    return Error <| ReceivedPeerErrorMessage (peerWrapper, { ErrorMessage = errorMessage })
-                | :? Ping as pingMsg ->
-                    let! msgStreamAfterPongSent = msgStreamAfterMsgReceived.SendMsg { Pong.BytesLen = pingMsg.PongLen }
+                    return Error <| ReceivedPeerErrorMessage (peerWrapper, { ErrorMsg = errorMsg })
+                | :? PingMsg as pingMsg ->
+                    let! msgStreamAfterPongSent = msgStreamAfterMsgReceived.SendMsg { PongMsg.BytesLen = pingMsg.PongLen }
                     return! recv msgStreamAfterPongSent
-                | :? Pong ->
+                | :? PongMsg ->
                     return failwith "sending pings is not implemented"
-                | :? Init ->
+                | :? InitMsg ->
                     return failwith "unexpected init msg"
                 | :? IRoutingMsg ->
                     Infrastructure.LogDebug "handling routing messages is not implemented"

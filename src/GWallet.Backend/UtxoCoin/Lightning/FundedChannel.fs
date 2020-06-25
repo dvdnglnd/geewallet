@@ -87,7 +87,7 @@ type internal AcceptChannelError =
 
 type internal FundedChannel = {
     ConnectedChannel: ConnectedChannel
-    TheirFundingLockedMsgOpt: Option<FundingLocked>
+    TheirFundingLockedMsgOpt: Option<FundingLockedMsg>
 } with
     interface IDisposable with
         member this.Dispose() =
@@ -100,7 +100,7 @@ type internal FundedChannel = {
         let channelWrapper = connectedChannel.ChannelWrapper
 
         let fundingCreatedMsgRes, channelWrapperAfterFundingCreated =
-            let channelCmd = ApplyAcceptChannel outgoingUnfundedChannel.AcceptChannel
+            let channelCmd = ApplyAcceptChannel outgoingUnfundedChannel.AcceptChannelMsg
             channelWrapper.ExecuteCommand channelCmd <| function
                 | (WeAcceptedAcceptChannel(fundingCreatedMsg, _)::[])
                     -> Some fundingCreatedMsg
@@ -126,7 +126,7 @@ type internal FundedChannel = {
                     (peerWrapperAfterFundingSigned, errorMessage)
             | Ok (peerWrapperAfterFundingSigned, channelMsg) ->
                 match channelMsg with
-                | :? FundingSigned as fundingSignedMsg ->
+                | :? FundingSignedMsg as fundingSignedMsg ->
                     let finalizedTxRes, channelWrapperAfterFundingSigned =
                         let channelCmd = ChannelCommand.ApplyFundingSigned fundingSignedMsg
                         channelWrapperAfterFundingCreated.ExecuteCommand channelCmd <| function
@@ -172,7 +172,7 @@ type internal FundedChannel = {
                 (peerWrapperAfterOpenChannel, errorMessage)
         | Ok (peerWrapperAfterOpenChannel, channelMsg) ->
             match channelMsg with
-            | :? OpenChannel as openChannelMsg ->
+            | :? OpenChannelMsg as openChannelMsg ->
                 let! channelWrapper =
                     let fundingTxProvider (_: IDestination, _: Money, _: FeeRatePerKw) =
                         failwith "not funding channel, so unreachable"
@@ -193,7 +193,7 @@ type internal FundedChannel = {
                         let inputInitFundee: InputInitFundee = {
                             TemporaryChannelId = openChannelMsg.TemporaryChannelId
                             LocalParams = localParams
-                            RemoteInit = peerWrapperAfterOpenChannel.Init
+                            RemoteInit = peerWrapperAfterOpenChannel.InitMsg
                             ToLocal = LNMoney 0L
                             ChannelKeys = channelKeys
                         }
@@ -231,7 +231,7 @@ type internal FundedChannel = {
                             (peerWrapperAfterFundingCreated, errorMessage)
                     | Ok (peerWrapperAfterFundingCreated, channelMsg) ->
                         match channelMsg with
-                        | :? FundingCreated as fundingCreatedMsg ->
+                        | :? FundingCreatedMsg as fundingCreatedMsg ->
                             let fundingSignedMsgRes, channelWrapperAfterFundingCreated =
                                 let channelCmd = ApplyFundingCreated fundingCreatedMsg
                                 channelWrapperAfterAcceptChannel.ExecuteCommand channelCmd <| function

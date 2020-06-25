@@ -117,9 +117,9 @@ type internal ConnectedChannel = {
                 return Error <| PeerErrorResponse (peerWrapperAfterNextMsgReceived, errorMessage)
             | Ok (peerWrapperAfterNextMsgReceived, channelMsg) ->
                 match channelMsg with
-                | :? ChannelReestablish as reestablishMsg ->
+                | :? ChannelReestablishMsg as reestablishMsg ->
                     return Ok (peerWrapperAfterNextMsgReceived, reestablishMsg)
-                | :? FundingLocked ->
+                | :? FundingLockedMsg ->
                     let! recvMsgRes = peerWrapperAfterNextMsgReceived.RecvChannelMsg()
                     match recvMsgRes with
                     | Error (RecvMsg recvMsgError) -> return Error <| RecvReestablish recvMsgError
@@ -128,7 +128,7 @@ type internal ConnectedChannel = {
                             (peerWrapperAfterReestablishReceived, errorMessage)
                     | Ok (peerWrapperAfterReestablishReceived, channelMsg) ->
                         match channelMsg with
-                        | :? ChannelReestablish as reestablishMsg ->
+                        | :? ChannelReestablishMsg as reestablishMsg ->
                             return Ok (peerWrapperAfterReestablishReceived, reestablishMsg)
                         | msg ->
                             return Error <| ExpectedReestablishMsg msg

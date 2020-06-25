@@ -78,9 +78,9 @@ type internal MsgStream = {
         featureBits
 
     static member private InitializeTransportStream (transportStream: TransportStream)
-                                                        : Async<Result<Init * MsgStream, InitializeError>> = async {
+                                                        : Async<Result<InitMsg * MsgStream, InitializeError>> = async {
         let! transportStreamAfterInitSent =
-            let plainInit: Init = {
+            let plainInit: InitMsg = {
                 Features = MsgStream.SupportedFeatures
                 TLVStream = [||]
             }
@@ -96,17 +96,17 @@ type internal MsgStream = {
             | Error msgError -> return Error <| DeserializeInit msgError
             | Ok msg ->
                 match msg with
-                | :? Init as init ->
+                | :? InitMsg as initMsg ->
                     let msgStream = { TransportStream = transportStreamAfterInitReceived }
-                    Infrastructure.LogDebug <| SPrintF1 "peer init features == %s" (init.Features.PrettyPrint)
-                    return Ok (init, msgStream)
+                    Infrastructure.LogDebug <| SPrintF1 "peer init features == %s" (initMsg.Features.PrettyPrint)
+                    return Ok (initMsg, msgStream)
                 | _ -> return Error <| UnexpectedMsg msg
     }
 
     static member internal Connect (nodeSecret: ExtKey)
                           (peerNodeId: NodeIdWrapper)
                           (peerId: PeerId)
-                              : Async<Result<Init * MsgStream, ConnectError>> = async {
+                              : Async<Result<InitMsg * MsgStream, ConnectError>> = async {
         let! transportStreamRes =
             TransportStream.Connect
                 nodeSecret
@@ -118,11 +118,11 @@ type internal MsgStream = {
             let! initializeRes = MsgStream.InitializeTransportStream transportStream
             match initializeRes with
             | Error initializeError -> return Error <| Initialize initializeError
-            | Ok (init, msgStream) -> return Ok (init, msgStream)
+            | Ok (initMsg, msgStream) -> return Ok (initMsg, msgStream)
     }
 
     static member internal AcceptFromTransportListener (transportListener: TransportListener)
-                                                  : Async<Result<Init * MsgStream, ConnectError>> = async {
+                                                  : Async<Result<InitMsg * MsgStream, ConnectError>> = async {
         let! transportStreamRes =
             TransportStream.AcceptFromTransportListener transportListener
         match transportStreamRes with
@@ -131,7 +131,7 @@ type internal MsgStream = {
             let! initializeRes = MsgStream.InitializeTransportStream transportStream
             match initializeRes with
             | Error initializeError -> return Error <| Initialize initializeError
-            | Ok (init, msgStream) -> return Ok (init, msgStream)
+            | Ok (initMsg, msgStream) -> return Ok (initMsg, msgStream)
     }
 
     member this.RemoteNodeId

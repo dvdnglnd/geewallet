@@ -45,7 +45,7 @@ type internal OpenChannelError =
 
 type internal OutgoingUnfundedChannel = {
     ConnectedChannel: ConnectedChannel
-    AcceptChannel: AcceptChannel
+    AcceptChannelMsg: AcceptChannelMsg
 } with
     static member OpenChannel (peerWrapper: PeerWrapper)
                               (account: NormalUtxoAccount)
@@ -105,7 +105,7 @@ type internal OutgoingUnfundedChannel = {
                     InitFeeRatePerKw = feeRate
                     FundingTxFeeRatePerKw = feeRate
                     LocalParams = localParams
-                    RemoteInit = peerWrapper.Init
+                    RemoteInit = peerWrapper.InitMsg
                     ChannelFlags = 0uy
                     ChannelKeys = channelWrapper.ChannelKeys
                 }
@@ -129,7 +129,7 @@ type internal OutgoingUnfundedChannel = {
                     (peerWrapperAfterAcceptChannel, errorMessage)
             | Ok (peerWrapperAfterAcceptChannel, channelMsg) ->
                 match channelMsg with
-                | :? AcceptChannel as acceptChannelMsg ->
+                | :? AcceptChannelMsg as acceptChannelMsg ->
                     let minimumDepth = acceptChannelMsg.MinimumDepth
                     let connectedChannel = {
                         PeerWrapper = peerWrapperAfterAcceptChannel
@@ -140,7 +140,7 @@ type internal OutgoingUnfundedChannel = {
                     }
                     let outgoingUnfundedChannel = {
                         ConnectedChannel = connectedChannel
-                        AcceptChannel = acceptChannelMsg
+                        AcceptChannelMsg = acceptChannelMsg
                     }
                     return Ok outgoingUnfundedChannel
                 | _ -> return Error <| ExpectedAcceptChannel channelMsg
