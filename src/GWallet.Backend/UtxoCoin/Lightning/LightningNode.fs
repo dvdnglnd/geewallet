@@ -270,7 +270,7 @@ type LightningNode internal (channelStore: ChannelStore, transportListener: Tran
                 return Ok ()
         }
 
-module public LightningNode =
+module public Lightning =
     let public Start = LightningNode.Start
     let public OpenChannel (lightningNode: LightningNode) = lightningNode.OpenChannel
     let public AcceptChannel (lightningNode: LightningNode) = lightningNode.AcceptChannel ()

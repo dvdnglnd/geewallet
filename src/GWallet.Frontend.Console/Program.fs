@@ -43,9 +43,9 @@ let OpenChannel(): Async<unit> = async {
                 if acceptFeeRate then
                     let password = UserInteraction.AskPassword false
                     let bindAddress = IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
-                    use lightningNode = LightningNode.Start channelStore password bindAddress
+                    use lightningNode = Lightning.Start channelStore password bindAddress
                     let! pendingChannelRes =
-                        LightningNode.OpenChannel
+                        Lightning.OpenChannel
                             lightningNode
                             lnEndPoint
                             channelCapacity
@@ -80,10 +80,10 @@ let AcceptChannel(): Async<unit> = async {
     let channelStore = ChannelStore account
     let bindAddress = UserInteraction.AskBindAddress()
     let password = UserInteraction.AskPassword false
-    use lightningNode = LightningNode.Start channelStore password bindAddress
-    let lnEndPoint = LightningNode.LnEndPoint lightningNode
+    use lightningNode = Lightning.Start channelStore password bindAddress
+    let lnEndPoint = Lightning.LnEndPoint lightningNode
     Console.WriteLine(sprintf "This node, connect to it: %s" (lnEndPoint.ToString()))
-    let! txIdRes = LightningNode.AcceptChannel lightningNode
+    let! txIdRes = Lightning.AcceptChannel lightningNode
     match txIdRes with
     | Error nodeAcceptChannelError ->
         Console.WriteLine
@@ -108,8 +108,8 @@ let SendLightningPayment(): Async<unit> = async {
         | Some transferAmount ->
             let password = UserInteraction.AskPassword false
             let bindAddress = IPEndPoint(IPAddress.Parse "127.0.0.1", 0)
-            use lightningNode = LightningNode.Start channelStore password bindAddress
-            let! paymentRes = LightningNode.SendMonoHopPayment lightningNode channelId transferAmount
+            use lightningNode = Lightning.Start channelStore password bindAddress
+            let! paymentRes = Lightning.SendMonoHopPayment lightningNode channelId transferAmount
             match paymentRes with
             | Error nodeSendMonoHopPaymentError ->
                 Console.WriteLine(sprintf "Error sending monohop payment: %s" nodeSendMonoHopPaymentError.Message)
@@ -127,10 +127,10 @@ let ReceiveLightningPayment(): Async<unit> = async {
     | Some channelId ->
         let bindAddress = UserInteraction.AskBindAddress()
         let password = UserInteraction.AskPassword false
-        use lightningNode = LightningNode.Start channelStore password bindAddress
+        use lightningNode = Lightning.Start channelStore password bindAddress
 
         let! receivePaymentRes =
-            LightningNode.ReceiveMonoHopPayment lightningNode channelId
+            Lightning.ReceiveMonoHopPayment lightningNode channelId
         match receivePaymentRes with
         | Error nodeReceiveMonoHopPaymentError ->
             Console.WriteLine(sprintf "Error receiving monohop payment: %s" nodeReceiveMonoHopPaymentError.Message)
@@ -156,9 +156,9 @@ let LockChannel (channelStore: ChannelStore)
             Console.WriteLine "Listening for connection from peer"
             UserInteraction.AskBindAddress()
     let password = UserInteraction.AskPassword false
-    use lightningNode = LightningNode.Start channelStore password bindAddress
+    use lightningNode = Lightning.Start channelStore password bindAddress
     async {
-        let! lockFundingRes = LightningNode.LockChannelFunding lightningNode channelId
+        let! lockFundingRes = Lightning.LockChannelFunding lightningNode channelId
         match lockFundingRes with
         | Error lockFundingError ->
             Console.WriteLine(sprintf "Error reestablishing channel: %s" lockFundingError.Message)
