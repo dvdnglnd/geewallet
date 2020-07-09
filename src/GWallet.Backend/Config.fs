@@ -12,9 +12,52 @@ open GWallet.Backend.FSharpUtil.UwpHacks
 // TODO: make internal when tests don't depend on this anymore
 module Config =
 
+    type RunMode =
+        | Normal
+        | Testing of DirectoryInfo
+
+#if DEBUG
+    let mutable runModeOpt: Option<RunMode> = None
+#else
+    let         runModeOpt: Option<RunMode> = Some RunMode.Normal
+#endif
+
+#if DEBUG
+    let public SetRunModeNormal() =
+        match runModeOpt with
+        | None -> runModeOpt <- Some RunMode.Normal
+        | Some RunMode.Normal -> ()
+        | Some runMode ->
+            failwith <| SPrintF1 "Run mode cannot be set to normal because it is already set to %A" runMode
+
+    let public SetRunModeTesting() =
+        match runModeOpt with
+        | None ->
+            let testDir = DirectoryInfo <| Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+            runModeOpt <- Some <| RunMode.Testing testDir
+        | Some (RunMode.Testing _) -> ()
+        | Some RunMode.Normal ->
+            failwith "Run mode cannot be set to testing because it is already set to normal"
+#else
+    let public SetRunModeNormal() = ()
+
+    let public SetRunModeTesting() =
+        failwith "Run mode cannot be set to testing when built in release mode"
+#endif
+
+    let public GetRunMode(): RunMode =
+        match runModeOpt with
+        | None ->
+            failwith "Run mode has not been set. You must call Config.SetRunMode at startup."
+        | Some runMode -> runMode
+
     // we might want to test with TestNet at some point, so this below is the key:
     // (but we would need to get a seed list of testnet electrum servers, and testnet(/ropsten/rinkeby?), first...)
-    let BitcoinNet = NBitcoin.Network.Main
+    let BitcoinNet() =
+        match GetRunMode() with
+        | Normal -> NBitcoin.Network.Main
+        | Testing _ -> NBitcoin.Network.RegTest
+
     let LitecoinNet = NBitcoin.Altcoins.Litecoin.Instance.Mainnet
     let EtcNet = Nethereum.Signer.Chain.ClassicMainNet
     let EthNet = Nethereum.Signer.Chain.MainNet
@@ -32,6 +75,12 @@ module Config =
     // NOTE: enabling this might look confusing because it only works for non-cache
     //       balances, so you might find discrepancies (e.g. the donut-chart-view)
     let internal NoNetworkBalanceForDebuggingPurposes = false
+
+    let OneIfRegTestElse(elseValue: uint32) =
+        if BitcoinNet() = NBitcoin.Network.RegTest then
+            1u
+        else
+            elseValue
 
     let IsWindowsPlatform() =
         Path.DirectorySeparatorChar = '\\'
@@ -73,8 +122,12 @@ module Config =
     let internal NUMBER_OF_RETRIES_TO_SAME_SERVERS = 3u
 
     let internal GetConfigDirForThisProgram() =
-        let configPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-        let configDir = DirectoryInfo(Path.Combine(configPath, "gwallet"))
+        let configDir =
+            match GetRunMode() with
+            | RunMode.Normal ->
+                let configPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                DirectoryInfo(Path.Combine(configPath, "gwallet"))
+            | RunMode.Testing configDir -> configDir
         if not configDir.Exists then
             configDir.Create()
         configDir

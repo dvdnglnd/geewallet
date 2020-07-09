@@ -646,6 +646,10 @@ let UpdateServersStats () =
 let main argv =
     match argv.Length with
     | 0 ->
+        Config.SetRunModeNormal()
+        NormalStartWithNoParameters()
+    | 2 when argv.[0] = "--regtest-on-localhost" ->
+        Config.SetRunModeTesting()
         NormalStartWithNoParameters()
     | 1 when argv.[0] = "--update-servers-file" ->
         UpdateServersFile()
