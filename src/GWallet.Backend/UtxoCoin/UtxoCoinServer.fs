@@ -46,10 +46,9 @@ module Server =
             ServerSelectionMode.Fast
             (Some (SpecificNumberOfConsistentResponsesRequired 1u))
 
-    let private FaultTolerantParallelClientSettingsForBalanceCheck
-        (mode: ServerSelectionMode)
-        cacheOrInitialBalanceMatchFunc
-        =
+    let private FaultTolerantParallelClientSettingsForBalanceCheck (mode: ServerSelectionMode)
+                                                                   cacheOrInitialBalanceMatchFunc
+                                                                   =
         let consistencyConfig =
             if mode = ServerSelectionMode.Fast then
                 Some (OneServerConsistentWithCertainValueOrTwoServers cacheOrInitialBalanceMatchFunc)
@@ -63,17 +62,13 @@ module Server =
 
     // FIXME: seems there's some code duplication between this function and EtherServer.fs's GetServerFuncs function
     //        and room for simplification to not pass a new ad-hoc delegate?
-    let internal GetServerFuncs<'R>
-        (electrumClientFunc: Async<StratumClient> -> Async<'R>)
-        (electrumServers: seq<ServerDetails>)
-        : seq<Server<ServerDetails, 'R>>
-        =
+    let internal GetServerFuncs<'R> (electrumClientFunc: Async<StratumClient> -> Async<'R>)
+                                    (electrumServers: seq<ServerDetails>)
+                                    : seq<Server<ServerDetails, 'R>> =
 
-        let ElectrumServerToRetrievalFunc
-            (server: ServerDetails)
-            (electrumClientFunc: Async<StratumClient> -> Async<'R>)
-            : Async<'R>
-            =
+        let ElectrumServerToRetrievalFunc (server: ServerDetails)
+                                          (electrumClientFunc: Async<StratumClient> -> Async<'R>)
+                                          : Async<'R> =
             async {
                 try
                     let stratumClient = ElectrumClient.StratumServer server
@@ -90,11 +85,9 @@ module Server =
                                    (SPrintF1 "Some problem when connecting to %s" server.ServerInfo.NetworkPath, ex)
             }
 
-        let ElectrumServerToGenericServer
-            (electrumClientFunc: Async<StratumClient> -> Async<'R>)
-            (electrumServer: ServerDetails)
-            : Server<ServerDetails, 'R>
-            =
+        let ElectrumServerToGenericServer (electrumClientFunc: Async<StratumClient> -> Async<'R>)
+                                          (electrumServer: ServerDetails)
+                                          : Server<ServerDetails, 'R> =
             {
                 Details = electrumServer
                 Retrieval = ElectrumServerToRetrievalFunc electrumServer electrumClientFunc
@@ -103,22 +96,18 @@ module Server =
         let serverFuncs = Seq.map (ElectrumServerToGenericServer electrumClientFunc) electrumServers
         serverFuncs
 
-    let private GetRandomizedFuncs<'R>
-        (currency: Currency)
-        (electrumClientFunc: Async<StratumClient> -> Async<'R>)
-        : List<Server<ServerDetails, 'R>>
-        =
+    let private GetRandomizedFuncs<'R> (currency: Currency)
+                                       (electrumClientFunc: Async<StratumClient> -> Async<'R>)
+                                       : List<Server<ServerDetails, 'R>> =
 
         let electrumServers = ElectrumServerSeedList.Randomize currency
         GetServerFuncs electrumClientFunc electrumServers |> List.ofSeq
 
-    let Query<'R when 'R: equality>
-        currency
-        (settings: QuerySettings<'R>)
-        (job: Async<StratumClient> -> Async<'R>)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<'R>
-        =
+    let Query<'R when 'R: equality> currency
+                                    (settings: QuerySettings<'R>)
+                                    (job: Async<StratumClient> -> Async<'R>)
+                                    (cancelSourceOption: Option<CustomCancelSource>)
+                                    : Async<'R> =
         let query =
             match cancelSourceOption with
             | None -> faultTolerantElectrumClient.Query

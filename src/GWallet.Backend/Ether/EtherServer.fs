@@ -286,11 +286,10 @@ module Server =
         | ServerSelectionMode.Fast -> 3u
         | ServerSelectionMode.Analysis -> 2u
 
-    let private FaultTolerantParallelClientInnerSettings
-        (numberOfConsistentResponsesRequired: uint32)
-        (mode: ServerSelectionMode)
-        maybeConsistencyConfig
-        =
+    let private FaultTolerantParallelClientInnerSettings (numberOfConsistentResponsesRequired: uint32)
+                                                         (mode: ServerSelectionMode)
+                                                         maybeConsistencyConfig
+                                                         =
 
         let consistencyConfig =
             match maybeConsistencyConfig with
@@ -322,11 +321,10 @@ module Server =
 
         FaultTolerantParallelClientInnerSettings numberOfConsistentResponsesRequired mode
 
-    let private FaultTolerantParallelClientSettingsForBalanceCheck
-        (mode: ServerSelectionMode)
-        (currency: Currency)
-        (cacheOrInitialBalanceMatchFunc: decimal -> bool)
-        =
+    let private FaultTolerantParallelClientSettingsForBalanceCheck (mode: ServerSelectionMode)
+                                                                   (currency: Currency)
+                                                                   (cacheOrInitialBalanceMatchFunc: decimal -> bool)
+                                                                   =
         let consistencyConfig =
             if etcEcosystemIsMomentarilyCentralized && currency = Currency.ETC then
                 None
@@ -376,16 +374,12 @@ module Server =
 
     // FIXME: seems there's some code duplication between this function and UtxoCoinAccount.fs's GetServerFuncs function
     //        and room for simplification to not pass a new ad-hoc delegate?
-    let GetServerFuncs<'R>
-        (web3Func: SomeWeb3 -> Async<'R>)
-        (etherServers: seq<ServerDetails>)
-        : seq<Server<ServerDetails, 'R>>
-        =
-        let Web3ServerToGenericServer
-            (web3ClientFunc: SomeWeb3 -> Async<'R>)
-            (etherServer: ServerDetails)
-            : Server<ServerDetails, 'R>
-            =
+    let GetServerFuncs<'R> (web3Func: SomeWeb3 -> Async<'R>)
+                           (etherServers: seq<ServerDetails>)
+                           : seq<Server<ServerDetails, 'R>> =
+        let Web3ServerToGenericServer (web3ClientFunc: SomeWeb3 -> Async<'R>)
+                                      (etherServer: ServerDetails)
+                                      : Server<ServerDetails, 'R> =
             {
                 Details = etherServer
                 Retrieval = Web3ServerToRetrievalFunc etherServer web3ClientFunc
@@ -394,11 +388,9 @@ module Server =
         let serverFuncs = Seq.map (Web3ServerToGenericServer web3Func) etherServers
         serverFuncs
 
-    let private GetRandomizedFuncs<'R>
-        (currency: Currency)
-        (web3Func: SomeWeb3 -> Async<'R>)
-        : List<Server<ServerDetails, 'R>>
-        =
+    let private GetRandomizedFuncs<'R> (currency: Currency)
+                                       (web3Func: SomeWeb3 -> Async<'R>)
+                                       : List<Server<ServerDetails, 'R>> =
         let etherServers = Web3ServerSeedList.Randomize currency
         GetServerFuncs web3Func etherServers |> List.ofSeq
 
@@ -479,14 +471,12 @@ module Server =
             | None -> false
             | Some balance -> someRetrievedBalance = balance
 
-    let GetEtherBalance
-        (currency: Currency)
-        (address: string)
-        (balType: BalanceType)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<decimal>
-        =
+    let GetEtherBalance (currency: Currency)
+                        (address: string)
+                        (balType: BalanceType)
+                        (mode: ServerSelectionMode)
+                        (cancelSourceOption: Option<CustomCancelSource>)
+                        : Async<decimal> =
         async {
             let web3Funcs =
                 let web3Func (web3: Web3): Async<decimal> =
@@ -549,14 +539,12 @@ module Server =
         }
 
 
-    let GetTokenBalance
-        (currency: Currency)
-        (address: string)
-        (balType: BalanceType)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<decimal>
-        =
+    let GetTokenBalance (currency: Currency)
+                        (address: string)
+                        (balType: BalanceType)
+                        (mode: ServerSelectionMode)
+                        (cancelSourceOption: Option<CustomCancelSource>)
+                        : Async<decimal> =
         async {
             let web3Funcs =
                 let web3Func (web3: Web3): Async<decimal> =
@@ -678,11 +666,9 @@ module Server =
                         return raise (FSharpUtil.ReRaise ex)
         }
 
-    let private GetTransactionDetailsFromTransactionReceipt
-        (currency: Currency)
-        (txHash: string)
-        : Async<TransactionStatusDetails>
-        =
+    let private GetTransactionDetailsFromTransactionReceipt (currency: Currency)
+                                                            (txHash: string)
+                                                            : Async<TransactionStatusDetails> =
         async {
             let web3Funcs =
                 let web3Func (web3: Web3): Async<TransactionStatusDetails> =

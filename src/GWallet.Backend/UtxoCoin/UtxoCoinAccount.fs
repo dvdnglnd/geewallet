@@ -18,7 +18,8 @@ type internal TransactionOutpoint =
         OutputIndex: int
     }
 
-    member self.ToCoin (): Coin = Coin (self.Transaction, uint32 self.OutputIndex)
+    member self.ToCoin (): Coin =
+        Coin (self.Transaction, uint32 self.OutputIndex)
 
 type internal IUtxoAccount =
     inherit IAccount
@@ -120,12 +121,10 @@ module Account =
         let amountInBtc = (Money.Satoshis amountToShowInSatoshis).ToUnit MoneyUnit.BTC
         amountInBtc
 
-    let private BalanceMatchWithCacheOrInitialBalance
-        address
-        currency
-        (someRetrievedBalance: BlockchainScriptHashGetBalanceInnerResult)
-        : bool
-        =
+    let private BalanceMatchWithCacheOrInitialBalance address
+                                                      currency
+                                                      (someRetrievedBalance: BlockchainScriptHashGetBalanceInnerResult)
+                                                      : bool =
         if Caching.Instance.FirstRun then
             BalanceToShow someRetrievedBalance = 0m
         else
@@ -133,12 +132,10 @@ module Account =
             | None -> false
             | Some balance -> BalanceToShow someRetrievedBalance = balance
 
-    let private GetBalances
-        (account: IUtxoAccount)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<BlockchainScriptHashGetBalanceInnerResult>
-        =
+    let private GetBalances (account: IUtxoAccount)
+                            (mode: ServerSelectionMode)
+                            (cancelSourceOption: Option<CustomCancelSource>)
+                            : Async<BlockchainScriptHashGetBalanceInnerResult> =
         let scriptHashHex = GetElectrumScriptHashFromPublicAddress account.Currency account.PublicAddress
 
         let querySettings =
@@ -147,12 +144,10 @@ module Account =
         let balanceJob = ElectrumClient.GetBalance scriptHashHex
         Server.Query account.Currency querySettings balanceJob cancelSourceOption
 
-    let private GetBalancesFromServer
-        (account: IUtxoAccount)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<Option<BlockchainScriptHashGetBalanceInnerResult>>
-        =
+    let private GetBalancesFromServer (account: IUtxoAccount)
+                                      (mode: ServerSelectionMode)
+                                      (cancelSourceOption: Option<CustomCancelSource>)
+                                      : Async<Option<BlockchainScriptHashGetBalanceInnerResult>> =
         async {
             try
                 let! balances = GetBalances account mode cancelSourceOption
@@ -160,12 +155,10 @@ module Account =
             with ex when (FSharpUtil.FindException<ResourceUnavailabilityException> ex).IsSome -> return None
         }
 
-    let internal GetShowableBalance
-        (account: IUtxoAccount)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<Option<decimal>>
-        =
+    let internal GetShowableBalance (account: IUtxoAccount)
+                                    (mode: ServerSelectionMode)
+                                    (cancelSourceOption: Option<CustomCancelSource>)
+                                    : Async<Option<decimal>> =
         async {
             let! maybeBalances = GetBalancesFromServer account mode cancelSourceOption
 
@@ -184,13 +177,11 @@ module Account =
 
         coin.ToScriptCoin account.PublicKey.WitHash.ScriptPubKey :> ICoin
 
-    let private CreateTransactionAndCoinsToBeSigned
-        (account: IUtxoAccount)
-        (transactionInputs: List<TransactionInputOutpointInfo>)
-        (destination: string)
-        (amount: TransferAmount)
-        : TransactionBuilder
-        =
+    let private CreateTransactionAndCoinsToBeSigned (account: IUtxoAccount)
+                                                    (transactionInputs: List<TransactionInputOutpointInfo>)
+                                                    (destination: string)
+                                                    (amount: TransferAmount)
+                                                    : TransactionBuilder =
         let coins = List.map (ConvertToICoin account) transactionInputs
 
         let transactionBuilder = (GetNetwork account.Currency).CreateTransactionBuilder()
@@ -221,11 +212,9 @@ module Account =
             Value: Int64
         }
 
-    let private ConvertToInputOutpointInfo
-        currency
-        (utxo: UnspentTransactionOutputInfo)
-        : Async<TransactionInputOutpointInfo>
-        =
+    let private ConvertToInputOutpointInfo currency
+                                           (utxo: UnspentTransactionOutputInfo)
+                                           : Async<TransactionInputOutpointInfo> =
         async {
             let job = ElectrumClient.GetBlockchainTransaction utxo.TransactionId
             let! transRaw = Server.Query currency (QuerySettings.Default ServerSelectionMode.Fast) job None
@@ -245,14 +234,12 @@ module Account =
             return ret
         }
 
-    let rec private EstimateFees
-        (txBuilder: TransactionBuilder)
-        (feeRate: FeeRate)
-        (account: IUtxoAccount)
-        (usedInputsSoFar: List<TransactionInputOutpointInfo>)
-        (unusedUtxos: List<UnspentTransactionOutputInfo>)
-        : Async<Money * List<TransactionInputOutpointInfo>>
-        =
+    let rec private EstimateFees (txBuilder: TransactionBuilder)
+                                 (feeRate: FeeRate)
+                                 (account: IUtxoAccount)
+                                 (usedInputsSoFar: List<TransactionInputOutpointInfo>)
+                                 (unusedUtxos: List<UnspentTransactionOutputInfo>)
+                                 : Async<Money * List<TransactionInputOutpointInfo>> =
         async {
             try
                 let fees = txBuilder.EstimateFees feeRate
@@ -266,24 +253,21 @@ module Account =
                     let newCoin = newInput |> ConvertToICoin account
 
                     let newTxBuilder = txBuilder.AddCoins [ newCoin ]
+
                     let newInputs = newInput :: usedInputsSoFar
                     return! EstimateFees newTxBuilder feeRate account newInputs tail
         }
 
-    let internal EstimateFee
-        (account: IUtxoAccount)
-        (amount: TransferAmount)
-        (destination: string)
-        : Async<TransactionMetadata>
-        =
+    let internal EstimateFee (account: IUtxoAccount)
+                             (amount: TransferAmount)
+                             (destination: string)
+                             : Async<TransactionMetadata> =
         async {
-            let rec addInputsUntilAmount
-                (utxos: List<UnspentTransactionOutputInfo>)
-                soFarInSatoshis
-                amount
-                (acc: List<UnspentTransactionOutputInfo>)
-                : List<UnspentTransactionOutputInfo> * List<UnspentTransactionOutputInfo>
-                =
+            let rec addInputsUntilAmount (utxos: List<UnspentTransactionOutputInfo>)
+                                         soFarInSatoshis
+                                         amount
+                                         (acc: List<UnspentTransactionOutputInfo>)
+                                         : List<UnspentTransactionOutputInfo> * List<UnspentTransactionOutputInfo> =
                 match utxos with
                 | [] ->
                     // should `raise InsufficientFunds` instead?
@@ -386,13 +370,12 @@ module Account =
             with :? NBitcoin.NotEnoughFundsException -> return raise <| InsufficientBalanceForFee None
         }
 
-    let private SignTransactionWithPrivateKey
-        (account: IUtxoAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (privateKey: Key)
-        =
+    let private SignTransactionWithPrivateKey (account: IUtxoAccount)
+                                              (txMetadata: TransactionMetadata)
+                                              (destination: string)
+                                              (amount: TransferAmount)
+                                              (privateKey: Key)
+                                              =
 
         let btcMinerFee = txMetadata.Fee
 
@@ -422,13 +405,12 @@ module Account =
             encryptedSecret.GetKey (password)
         with :? SecurityException -> raise (InvalidPassword)
 
-    let internal SignTransaction
-        (account: NormalUtxoAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (password: string)
-        =
+    let internal SignTransaction (account: NormalUtxoAccount)
+                                 (txMetadata: TransactionMetadata)
+                                 (destination: string)
+                                 (amount: TransferAmount)
+                                 (password: string)
+                                 =
 
         let privateKey = GetPrivateKey account password
 
@@ -448,13 +430,12 @@ module Account =
         // and show the info from the RawTx, using NBitcoin to extract it
         BroadcastRawTransaction currency transaction.RawTransaction
 
-    let internal SendPayment
-        (account: NormalUtxoAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (password: string)
-        =
+    let internal SendPayment (account: NormalUtxoAccount)
+                             (txMetadata: TransactionMetadata)
+                             (destination: string)
+                             (amount: TransferAmount)
+                             (password: string)
+                             =
         let baseAccount = account :> IAccount
         if (baseAccount.PublicAddress.Equals (destination, StringComparison.InvariantCultureIgnoreCase)) then
             raise DestinationEqualToOrigin
@@ -466,12 +447,10 @@ module Account =
     let public ExportUnsignedTransactionToJson trans =
         Marshalling.Serialize trans
 
-    let internal SaveUnsignedTransaction
-        (transProposal: UnsignedTransactionProposal)
-        (txMetadata: TransactionMetadata)
-        (readOnlyAccounts: seq<ReadOnlyAccount>)
-        : string
-        =
+    let internal SaveUnsignedTransaction (transProposal: UnsignedTransactionProposal)
+                                         (txMetadata: TransactionMetadata)
+                                         (readOnlyAccounts: seq<ReadOnlyAccount>)
+                                         : string =
 
         let unsignedTransaction =
             {
@@ -482,12 +461,11 @@ module Account =
 
         ExportUnsignedTransactionToJson unsignedTransaction
 
-    let internal SweepArchivedFunds
-        (account: ArchivedUtxoAccount)
-        (balance: decimal)
-        (destination: IAccount)
-        (txMetadata: TransactionMetadata)
-        =
+    let internal SweepArchivedFunds (account: ArchivedUtxoAccount)
+                                    (balance: decimal)
+                                    (destination: IAccount)
+                                    (txMetadata: TransactionMetadata)
+                                    =
         let currency = (account :> IAccount).Currency
         let network = GetNetwork currency
         let amount = TransferAmount (balance, balance, currency)

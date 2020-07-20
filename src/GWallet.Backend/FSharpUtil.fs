@@ -182,6 +182,7 @@ module FSharpUtil =
                 let! allJobsStarted = allJobsInParallel
 
                 let! _ = Async.AwaitTask taskSource.Task
+
                 return allJobsStarted
             }
 

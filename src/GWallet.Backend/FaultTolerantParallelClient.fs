@@ -96,7 +96,9 @@ type MutableStateUnsafeAccessor<'T> (initialState: 'T) =
 type MutableStateCapsule<'T> (initialState: 'T) =
     let state = MutableStateUnsafeAccessor initialState
     let lockObject = Object ()
-    member __.SafeDo (func: MutableStateUnsafeAccessor<'T> -> 'R): 'R = lock lockObject (fun _ -> func state)
+
+    member __.SafeDo (func: MutableStateUnsafeAccessor<'T> -> 'R): 'R =
+        lock lockObject (fun _ -> func state)
 
 type ServerJob<'K, 'R when 'K: equality and 'K :> ICommunicationHistory> =
     {
@@ -303,17 +305,15 @@ type FaultTolerantParallelClient<'K, 'E when 'K: equality and 'K :> ICommunicati
 
         serverTask
 
-    let rec WhenSomeInternal
-        (consistencySettings: Option<ConsistencySettings<'R>>)
-        (initialServerCount: uint32)
-        (startedTasks: List<ServerTask<'K, 'R>>)
-        (jobsToLaunchLater: List<ServerJob<'K, 'R>>)
-        (resultsSoFar: List<'R>)
-        (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
-        (cancellationSource: Option<CustomCancelSource>)
-        (cancelState: ClientCancelState)
-        : Async<FinalResult<'K, 'T, 'R>>
-        =
+    let rec WhenSomeInternal (consistencySettings: Option<ConsistencySettings<'R>>)
+                             (initialServerCount: uint32)
+                             (startedTasks: List<ServerTask<'K, 'R>>)
+                             (jobsToLaunchLater: List<ServerJob<'K, 'R>>)
+                             (resultsSoFar: List<'R>)
+                             (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
+                             (cancellationSource: Option<CustomCancelSource>)
+                             (cancelState: ClientCancelState)
+                             : Async<FinalResult<'K, 'T, 'R>> =
         async {
             if startedTasks = List.Empty then
                 return InconsistentOrNotEnoughResults
@@ -448,15 +448,13 @@ type FaultTolerantParallelClient<'K, 'E when 'K: equality and 'K :> ICommunicati
     // "Async.WhenAny" in TomasP's tryJoinads source code, however it seemed a bit complex for me to wrap my head around
     // it (and I couldn't just consume it and call it a day, I had to modify it to be "WhenSome" instead of "WhenAny",
     // as in when N>1), so I decided to write my own, using Tasks to make sure I would not spawn duplicate jobs
-    let WhenSome
-        (settings: FaultTolerantParallelClientSettings<'R>)
-        consistencyConfig
-        (funcs: List<Server<'K, 'R>>)
-        (resultsSoFar: List<'R>)
-        (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
-        (cancellationSource: Option<CustomCancelSource>)
-        : Async<FinalResult<'K, 'T, 'R>>
-        =
+    let WhenSome (settings: FaultTolerantParallelClientSettings<'R>)
+                 consistencyConfig
+                 (funcs: List<Server<'K, 'R>>)
+                 (resultsSoFar: List<'R>)
+                 (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
+                 (cancellationSource: Option<CustomCancelSource>)
+                 : Async<FinalResult<'K, 'T, 'R>> =
 
         let initialServerCount = funcs.Length |> uint32
 
@@ -526,17 +524,15 @@ type FaultTolerantParallelClient<'K, 'E when 'K: equality and 'K :> ICommunicati
 
         jobWithCancellation
 
-    let rec QueryInternalImplementation
-        (settings: FaultTolerantParallelClientSettings<'R>)
-        (initialFuncCount: uint32)
-        (funcs: List<Server<'K, 'R>>)
-        (resultsSoFar: List<'R>)
-        (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
-        (retries: uint32)
-        (retriesForInconsistency: uint32)
-        (cancellationSource: Option<CustomCancelSource>)
-        : Async<'R>
-        =
+    let rec QueryInternalImplementation (settings: FaultTolerantParallelClientSettings<'R>)
+                                        (initialFuncCount: uint32)
+                                        (funcs: List<Server<'K, 'R>>)
+                                        (resultsSoFar: List<'R>)
+                                        (failedFuncsSoFar: List<UnsuccessfulServer<'K, 'R>>)
+                                        (retries: uint32)
+                                        (retriesForInconsistency: uint32)
+                                        (cancellationSource: Option<CustomCancelSource>)
+                                        : Async<'R> =
         async {
             if not (funcs.Any ()) then
                 return raise (ArgumentException ("number of funcs must be higher than zero", "funcs"))

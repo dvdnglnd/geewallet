@@ -48,11 +48,9 @@ type CachedNetworkData =
         }
 
     member self.ToDietCache (readOnlyAccounts: seq<ReadOnlyAccount>) =
-        let rec extractAddressesFromAccounts
-            (acc: Map<PublicAddress, List<DietCurrency>>)
-            (accounts: List<IAccount>)
-            : Map<PublicAddress, List<DietCurrency>>
-            =
+        let rec extractAddressesFromAccounts (acc: Map<PublicAddress, List<DietCurrency>>)
+                                             (accounts: List<IAccount>)
+                                             : Map<PublicAddress, List<DietCurrency>> =
             match accounts with
             | [] -> acc
             | head :: tail ->
@@ -168,12 +166,11 @@ module Caching =
         | None -> maybeFirstRun, resultingNetworkData, Map.empty
         | Some serverStats -> false, resultingNetworkData, serverStats
 
-    let rec private MergeRatesInternal
-        (oldMap: Map<'K, CachedValue<'V>>)
-        (newMap: Map<'K, CachedValue<'V>>)
-        (currencyList: List<'K>)
-        (accumulator: Map<'K, CachedValue<'V>>)
-        =
+    let rec private MergeRatesInternal (oldMap: Map<'K, CachedValue<'V>>)
+                                       (newMap: Map<'K, CachedValue<'V>>)
+                                       (currencyList: List<'K>)
+                                       (accumulator: Map<'K, CachedValue<'V>>)
+                                       =
         match currencyList with
         | [] -> accumulator
         | address :: tail ->
@@ -198,13 +195,11 @@ module Caching =
         let currencyList = Map.toList newMap |> List.map fst
         MergeRatesInternal oldMap newMap currencyList oldMap
 
-    let rec private MergeBalancesInternal
-        (oldMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
-        (newMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
-        (addressList: List<Currency * PublicAddress>)
-        (accumulator: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
-        : Map<Currency, Map<PublicAddress, CachedValue<'V>>>
-        =
+    let rec private MergeBalancesInternal (oldMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
+                                          (newMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
+                                          (addressList: List<Currency * PublicAddress>)
+                                          (accumulator: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
+                                          : Map<Currency, Map<PublicAddress, CachedValue<'V>>> =
         match addressList with
         | [] -> accumulator
         | (currency, address) :: tail ->
@@ -236,11 +231,9 @@ module Caching =
 
                     MergeBalancesInternal oldMap newMap tail newAcc
 
-    let private MergeBalances
-        (oldMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
-        (newMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
-        : Map<Currency, Map<PublicAddress, CachedValue<'V>>>
-        =
+    let private MergeBalances (oldMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
+                              (newMap: Map<Currency, Map<PublicAddress, CachedValue<'V>>>)
+                              : Map<Currency, Map<PublicAddress, CachedValue<'V>>> =
         let addressList =
             seq {
                 for currency, subMap in Map.toList newMap do
@@ -309,12 +302,10 @@ module Caching =
         let mutable sessionCachedNetworkData = initialSessionCachedNetworkData
         let mutable sessionServerRanking = initialServerStats
 
-        let GetSumOfAllTransactions
-            (trans: Map<Currency, Map<PublicAddress, Map<string, CachedValue<decimal>>>>)
-            currency
-            address
-            : decimal
-            =
+        let GetSumOfAllTransactions (trans: Map<Currency, Map<PublicAddress, Map<string, CachedValue<decimal>>>>)
+                                    currency
+                                    address
+                                    : decimal =
             let now = DateTime.UtcNow
             let currencyTrans = trans.TryFind currency
             match currencyTrans with
@@ -455,6 +446,7 @@ module Caching =
                             let! currencyAddresses = newCachedValueWithNewBalance.OutgoingTransactions.TryFind currency
 
                             let! addressTransactions = currencyAddresses.TryFind address
+
                             let allCombinationsOfTransactions = MapCombinations addressTransactions
 
                             let newAddressTransactions =

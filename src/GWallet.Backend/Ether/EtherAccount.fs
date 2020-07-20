@@ -47,12 +47,11 @@ module internal Account =
         | AccountKind.Normal -> NormalAccount (currency, accountFile, GetPublicAddressFromNormalAccountFile) :> IAccount
         | _ -> failwith <| SPrintF1 "Kind (%A) not supported for this API" kind
 
-    let private GetBalance
-        (account: IAccount)
-        (mode: ServerSelectionMode)
-        (balType: BalanceType)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        =
+    let private GetBalance (account: IAccount)
+                           (mode: ServerSelectionMode)
+                           (balType: BalanceType)
+                           (cancelSourceOption: Option<CustomCancelSource>)
+                           =
         async {
             let! balance =
                 if (account.Currency.IsEther ()) then
@@ -66,13 +65,11 @@ module internal Account =
             return balance
         }
 
-    let private GetBalanceFromServer
-        (account: IAccount)
-        (balType: BalanceType)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<Option<decimal>>
-        =
+    let private GetBalanceFromServer (account: IAccount)
+                                     (balType: BalanceType)
+                                     (mode: ServerSelectionMode)
+                                     (cancelSourceOption: Option<CustomCancelSource>)
+                                     : Async<Option<decimal>> =
         async {
             try
                 let! balance = GetBalance account mode balType cancelSourceOption
@@ -80,13 +77,12 @@ module internal Account =
             with ex when (FSharpUtil.FindException<ResourceUnavailabilityException> ex).IsSome -> return None
         }
 
-    let internal GetShowableBalance
-        (account: IAccount)
-        (mode: ServerSelectionMode)
-        (cancelSourceOption: Option<CustomCancelSource>)
-        : Async<Option<decimal>>
-        =
-        let getBalanceWithoutCaching (maybeUnconfirmedBalanceTaskAlreadyStarted: Option<Task<Option<decimal>>>): Async<Option<decimal>> =
+    let internal GetShowableBalance (account: IAccount)
+                                    (mode: ServerSelectionMode)
+                                    (cancelSourceOption: Option<CustomCancelSource>)
+                                    : Async<Option<decimal>> =
+        let getBalanceWithoutCaching (maybeUnconfirmedBalanceTaskAlreadyStarted: Option<Task<Option<decimal>>>)
+                                     : Async<Option<decimal>> =
             async {
                 let! confirmed = GetBalanceFromServer account BalanceType.Confirmed mode cancelSourceOption
 
@@ -278,13 +274,12 @@ module internal Account =
             failwith
             <| SPrintF1 "Assertion failed: Ether currency %A not supported?" currency
 
-    let private SignEtherTransaction
-        (currency: Currency)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (privateKey: EthECKey)
-        =
+    let private SignEtherTransaction (currency: Currency)
+                                     (txMetadata: TransactionMetadata)
+                                     (destination: string)
+                                     (amount: TransferAmount)
+                                     (privateKey: EthECKey)
+                                     =
 
         let chain = GetNetwork currency
         if (GetNetwork txMetadata.Fee.Currency <> chain) then
@@ -323,14 +318,13 @@ module internal Account =
 
         trans
 
-    let private SignEtherTokenTransaction
-        (currency: Currency)
-        (txMetadata: TransactionMetadata)
-        (origin: string)
-        (destination: string)
-        (amount: TransferAmount)
-        (privateKey: EthECKey)
-        =
+    let private SignEtherTokenTransaction (currency: Currency)
+                                          (txMetadata: TransactionMetadata)
+                                          (origin: string)
+                                          (destination: string)
+                                          (amount: TransferAmount)
+                                          (privateKey: EthECKey)
+                                          =
 
         let chain = GetNetwork currency
         let privKeyInBytes = privateKey.GetPrivateKeyAsBytes ()
@@ -349,13 +343,12 @@ module internal Account =
 
         signer.SignTransaction (privKeyInBytes, chain, contractAddress, etherValue, nonce, gasPrice, gasLimit, data)
 
-    let private SignTransactionWithPrivateKey
-        (account: IAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (privateKey: EthECKey)
-        =
+    let private SignTransactionWithPrivateKey (account: IAccount)
+                                              (txMetadata: TransactionMetadata)
+                                              (destination: string)
+                                              (amount: TransferAmount)
+                                              (privateKey: EthECKey)
+                                              =
 
         let trans =
             if account.Currency.IsEthToken () then
@@ -383,13 +376,12 @@ module internal Account =
             failwith "Transaction could not be verified?"
         trans
 
-    let SignTransaction
-        (account: NormalAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (password: string)
-        =
+    let SignTransaction (account: NormalAccount)
+                        (txMetadata: TransactionMetadata)
+                        (destination: string)
+                        (amount: TransferAmount)
+                        (password: string)
+                        =
 
         let privateKey = GetPrivateKey account password
         SignTransactionWithPrivateKey account txMetadata destination amount privateKey
@@ -397,12 +389,11 @@ module internal Account =
     let CheckValidPassword (account: NormalAccount) (password: string) =
         GetPrivateKey account password |> ignore
 
-    let SweepArchivedFunds
-        (account: ArchivedAccount)
-        (balance: decimal)
-        (destination: IAccount)
-        (txMetadata: TransactionMetadata)
-        =
+    let SweepArchivedFunds (account: ArchivedAccount)
+                           (balance: decimal)
+                           (destination: IAccount)
+                           (txMetadata: TransactionMetadata)
+                           =
         let accountFrom = (account :> IAccount)
         let amount = TransferAmount (balance, balance, accountFrom.Currency)
         let ecPrivKey = EthECKey (account.GetUnencryptedPrivateKey ())
@@ -412,13 +403,12 @@ module internal Account =
 
         BroadcastRawTransaction accountFrom.Currency signedTrans
 
-    let SendPayment
-        (account: NormalAccount)
-        (txMetadata: TransactionMetadata)
-        (destination: string)
-        (amount: TransferAmount)
-        (password: string)
-        =
+    let SendPayment (account: NormalAccount)
+                    (txMetadata: TransactionMetadata)
+                    (destination: string)
+                    (amount: TransferAmount)
+                    (password: string)
+                    =
         let baseAccount = account :> IAccount
         if (baseAccount.PublicAddress.Equals (destination, StringComparison.InvariantCultureIgnoreCase)) then
             raise DestinationEqualToOrigin
@@ -451,12 +441,10 @@ module internal Account =
     let public ExportUnsignedTransactionToJson trans =
         Marshalling.Serialize trans
 
-    let SaveUnsignedTransaction
-        (transProposal: UnsignedTransactionProposal)
-        (txMetadata: TransactionMetadata)
-        (readOnlyAccounts: seq<ReadOnlyAccount>)
-        : string
-        =
+    let SaveUnsignedTransaction (transProposal: UnsignedTransactionProposal)
+                                (txMetadata: TransactionMetadata)
+                                (readOnlyAccounts: seq<ReadOnlyAccount>)
+                                : string =
 
         let unsignedTransaction =
             {

@@ -79,11 +79,9 @@ module ServerRegistry =
 
     let ServersEmbeddedResourceFileName = "servers.json"
 
-    let internal TryFindValue
-        (map: ServerRanking)
-        (serverPredicate: ServerDetails -> bool)
-        : Option<Currency * ServerDetails>
-        =
+    let internal TryFindValue (map: ServerRanking)
+                              (serverPredicate: ServerDetails -> bool)
+                              : Option<Currency * ServerDetails> =
         let rec tryFind currencyAndServers server =
             match currencyAndServers with
             | [] -> None
