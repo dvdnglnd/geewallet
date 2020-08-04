@@ -81,13 +81,13 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="DotNetLightning.Core">
-      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200803-1725-git-97c7fbe\lib\netstandard2.0\DotNetLightning.Core.dll</HintPath>
+      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200804-1032-git-91e031d\lib\netstandard2.0\DotNetLightning.Core.dll</HintPath>
     </Reference>
     <Reference Include="InternalBech32Encoder">
-      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200803-1725-git-97c7fbe\lib\netstandard2.0\InternalBech32Encoder.dll</HintPath>
+      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200804-1032-git-91e031d\lib\netstandard2.0\InternalBech32Encoder.dll</HintPath>
     </Reference>
     <Reference Include="Macaroons">
-      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200803-1725-git-97c7fbe\lib\netstandard2.0\Macaroons.dll</HintPath>
+      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200804-1032-git-91e031d\lib\netstandard2.0\Macaroons.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="NBitcoin">
@@ -97,7 +97,7 @@
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="ResultUtils">
-      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200803-1725-git-97c7fbe\lib\netstandard2.0\ResultUtils.dll</HintPath>
+      <HintPath>..\..\packages\DotNetLightning.Kiss.1.1.2-date20200804-1032-git-91e031d\lib\netstandard2.0\ResultUtils.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
